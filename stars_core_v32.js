@@ -383,102 +383,104 @@ async function initDashboard() {
             }).join('');
 
             // Program Staff still see management but restricted
-            // This replaces the old email check and lets anyone with a counselor role in
+            // Program Staff still see management but restricted
             if (user.role === 'Program Manager' || user.role === 'Counselor' || isCounselor) {
                 sidebar.innerHTML += `<li class="sidebar-btn" onclick="window.location.href='/admin.html'" style="color:#e84393; font-weight:800; background:#fff1f6;">Management Console</li>`;
             }
+
+            window.showPage('dashboard');
+
+            // Populate Profile page
+            const fname = user.full_name ? user.full_name.split(' ')[0] : 'User';
+            const lname = user.full_name ? user.full_name.split(' ')[1] || '' : '';
+
+            document.getElementById('prof-fname').textContent = fname;
+            document.getElementById('prof-lname').textContent = lname;
+            document.getElementById('prof-email').textContent = user.email;
+
+            dismissLoader();
+        } catch (e) {
+            console.log(`Dash error: ${e.message}`);
+            dismissLoader();)
         }
-    }
-        window.showPage('dashboard');
-    // Populate Profile page
-    if (document.getElementById('prof-fname')) document.getElementById('prof-fname').textContent = fname;
-    if (document.getElementById('prof-lname')) document.getElementById('prof-lname').textContent = lname;
-    if (document.getElementById('prof-email')) document.getElementById('prof-email').textContent = user.email || 'user@naischool.ae';
 
-    dismissLoader();
-} catch (e) {
-    log(`Dash error: ${e.message}`);
-    dismissLoader();
-}
-}
-
-function dismissLoader() {
-    const l = document.getElementById('system-loader');
-    if (l) {
-        l.style.setProperty('display', 'none', 'important');
-        log("Initial loader dismissed.");
-    }
-}
-window.dismissLoader = dismissLoader;
-
-function renderDashboardUI(data) {
-    const user = StarsSession.get()?.user;
-    if (!user) return;
-
-    const isCounselor = !!user?.isCounselor || !!user?.is_counselor;
-    const isStaff = user?.role === 'ProgramStaff' || isCounselor;
-
-    if (STARS_DEBUG) console.log("[DASH]: Rendering for", user.role, "Staff?", isStaff);
-
-    // 1. Discovery/Find Mentors Gating
-    const discSec = document.getElementById('dash-all-mentors-section');
-    if (discSec) {
-        if (user.role === 'Mentee' || isStaff) {
-            discSec.style.display = 'none';
-        } else {
-            discSec.style.display = 'block';
-            if (window.renderMentors) window.renderMentors(data.mentors || [], 'dash-mentors-list-container');
+        function dismissLoader() {
+            const l = document.getElementById('system-loader');
+            if (l) {
+                l.style.setProperty('display', 'none', 'important');
+                log("Initial loader dismissed.");
+            }
         }
-    }
+        window.dismissLoader = dismissLoader;
 
-    // 2. Authoritative Quick Actions Rendering (MUST RENDER REGARDLESS OF PAIRS)
-    const qa = document.getElementById('dash-quick-actions');
-    if (qa) {
-        let actions = '';
-        if (isStaff) {
-            const btnOne = isCounselor ? 'Messages' : 'Library';
-            const pageOne = isCounselor ? 'messages' : 'resources';
-            const btnTwo = isCounselor ? 'Survey Center' : 'My Sessions';
-            const pageTwo = isCounselor ? 'survey' : 'sessions';
+        function renderDashboardUI(data) {
+            const user = StarsSession.get()?.user;
+            if (!user) return;
 
-            actions = `
+            const isCounselor = !!user?.isCounselor || !!user?.is_counselor;
+            const isStaff = user?.role === 'ProgramStaff' || isCounselor;
+
+            if (STARS_DEBUG) console.log("[DASH]: Rendering for", user.role, "Staff?", isStaff);
+
+            // 1. Discovery/Find Mentors Gating
+            const discSec = document.getElementById('dash-all-mentors-section');
+            if (discSec) {
+                if (user.role === 'Mentee' || isStaff) {
+                    discSec.style.display = 'none';
+                } else {
+                    discSec.style.display = 'block';
+                    if (window.renderMentors) window.renderMentors(data.mentors || [], 'dash-mentors-list-container');
+                }
+            }
+
+            // 2. Authoritative Quick Actions Rendering (MUST RENDER REGARDLESS OF PAIRS)
+            const qa = document.getElementById('dash-quick-actions');
+            if (qa) {
+                let actions = '';
+                if (isStaff) {
+                    const btnOne = isCounselor ? 'Messages' : 'Library';
+                    const pageOne = isCounselor ? 'messages' : 'resources';
+                    const btnTwo = isCounselor ? 'Survey Center' : 'My Sessions';
+                    const pageTwo = isCounselor ? 'survey' : 'sessions';
+
+                    actions = `
                 <button class="btn-magenta" onclick="window.location.href='admin.html'">Management Console</button>
                 <button class="btn-white" onclick="window.showPage('${pageOne}')">${btnOne}</button>
                 <button class="btn-white" onclick="window.showPage('${pageTwo}')">${btnTwo}</button>
             `;
-        } else if (user.role === 'Visitor') {
-            actions = `
+                } else if (user.role === 'Visitor') {
+                    actions = `
                 <button class="btn-magenta" onclick="window.showPage('resources')">Browse Library</button>
                 <button class="btn-white" onclick="window.showPage('profile')">My Profile</button>
             `;
-        } else if (user.role === 'Mentor') {
-            actions = `
+                } else if (user.role === 'Mentor') {
+                    actions = `
                 <button class="btn-magenta" onclick="window.showPage('messages')">Messages</button>
                 <button class="btn-white" onclick="window.showPage('mentors')">Find Mentors</button>
                 <button class="btn-white" onclick="window.showPage('sessions')">My Sessions</button>
             `;
-        } else {
-            // Mentee flow
-            actions = `
+                } else {
+                    // Mentee flow
+                    actions = `
                 <button class="btn-magenta" onclick="window.showPage('messages')">Messages</button>
                 <button class="btn-white" onclick="window.showPage('sessions')">My Sessions</button>
             `;
-        }
-        qa.innerHTML = `<div class="section-title">QUICK ACTIONS</div><div style="display:flex; gap:1rem; margin-top:1rem;">${actions}</div>`;
-    }
+                }
+                qa.innerHTML = `<div class="section-title">QUICK ACTIONS</div><div style="display:flex; gap:1rem; margin-top:1rem;">${actions}</div>`;
+            }
 
-    // 3. Robust Pairings Rendering
-    const pairCont = document.getElementById('dash-pair-section');
-    if (pairCont) {
-        const pairs = data.pairs || [];
-        if (pairs.length === 0) {
-            pairCont.innerHTML = `<div style="text-align:center; padding:3rem; color:#94a3b8; font-weight:600;">No active pairings found. Please contact an administrator.</div>`;
-            // DO NOT RETURN. Continue rendering.
-        } else if (isStaff) {
-            // Staff View: 2-Column Grid
-            pairCont.innerHTML = `<div class="section-title" style="margin-top:2rem;">MENTOR-MENTEE PAIRINGS</div>
+            // 3. Robust Pairings Rendering
+            const pairCont = document.getElementById('dash-pair-section');
+            if (pairCont) {
+                const pairs = data.pairs || [];
+                if (pairs.length === 0) {
+                    pairCont.innerHTML = `<div style="text-align:center; padding:3rem; color:#94a3b8; font-weight:600;">No active pairings found. Please contact an administrator.</div>`;
+                    // DO NOT RETURN. Continue rendering.
+                } else if (isStaff) {
+                    // Staff View: 2-Column Grid
+                    pairCont.innerHTML = `<div class="section-title" style="margin-top:2rem;">MENTOR-MENTEE PAIRINGS</div>
             <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; margin-top: 1rem;">` +
-                pairs.map(p => `
+                        pairs.map(p => `
                 <div class="glass-card" style="padding: 1.5rem; border-radius: 20px; background: white; border: 1.5px solid #f1f5f9;">
                     <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1.25rem;">
                         <div style="background: #e91e63; color: white; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 0.9rem;">${p.mentor_name?.charAt(0) || 'M'}</div>
@@ -498,12 +500,12 @@ function renderDashboardUI(data) {
                     </div>
                 </div>
             `).join('') + `</div>`;
-        } else {
-            // Student View (Mentor or Mentee)
-            const typeLabel = (pairs[0].type || "").toUpperCase().includes('MENTEE') ? 'MENTEES' : 'MENTORS';
-            pairCont.innerHTML = `<div class="section-title" style="margin-top:2rem;">YOUR ${typeLabel}</div>` + pairs.map(p => {
-                const initial = (p.name || "U").charAt(0);
-                return `
+                } else {
+                    // Student View (Mentor or Mentee)
+                    const typeLabel = (pairs[0].type || "").toUpperCase().includes('MENTEE') ? 'MENTEES' : 'MENTORS';
+                    pairCont.innerHTML = `<div class="section-title" style="margin-top:2rem;">YOUR ${typeLabel}</div>` + pairs.map(p => {
+                        const initial = (p.name || "U").charAt(0);
+                        return `
                     <div class="mentee-card-yellow" style="margin-bottom: 2rem; border-radius: 28px; padding: 2.5rem; border: 2px solid #fef3c7; background: #fffcf0;">
                         <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
                             <div style="display: flex; align-items: center; gap: 2.5rem;">
@@ -527,107 +529,107 @@ function renderDashboardUI(data) {
                         </div>
                     </div>
                 `;
-            }).join('');
+                    }).join('');
+                }
+            }
         }
-    }
-}
 
-// 5. Survey Center
-window.SURVEY_FILTERS = { role: 'Mentor', type: 'All', mentee: 'All', mode: 'self', days: 30 };
-window.CURRENT_ANALYTICS_DAYS = parseInt(30);
+        // 5. Survey Center
+        window.SURVEY_FILTERS = { role: 'Mentor', type: 'All', mentee: 'All', mode: 'self', days: 30 };
+        window.CURRENT_ANALYTICS_DAYS = parseInt(30);
 
-window.switchSurveyView = function (view) {
-    const user = StarsSession.get()?.user;
-    if (user?.role === 'Mentor' && view === 'trends') return;
-    document.getElementById('survey-list-view').style.display = (view === 'list' ? 'block' : 'none');
-    document.getElementById('survey-analytics-view').style.display = (view === 'trends' ? 'block' : 'none');
-    document.getElementById('toggle-list')?.classList.toggle('active', view === 'list');
-    document.getElementById('toggle-trends')?.classList.toggle('active', view === 'trends');
-    if (view === 'trends') window.renderSurveyTrends();
-};
+        window.switchSurveyView = function (view) {
+            const user = StarsSession.get()?.user;
+            if (user?.role === 'Mentor' && view === 'trends') return;
+            document.getElementById('survey-list-view').style.display = (view === 'list' ? 'block' : 'none');
+            document.getElementById('survey-analytics-view').style.display = (view === 'trends' ? 'block' : 'none');
+            document.getElementById('toggle-list')?.classList.toggle('active', view === 'list');
+            document.getElementById('toggle-trends')?.classList.toggle('active', view === 'trends');
+            if (view === 'trends') window.renderSurveyTrends();
+        };
 
-window.renderSurveyCenter = async function () {
-    const user = StarsSession.get()?.user;
-    if (!user) return;
-    const isStaff = user.role === 'ProgramStaff' || !!user.isCounselor || !!user.is_counselor;
-    const isMentor = user.role === 'Mentor';
+        window.renderSurveyCenter = async function () {
+            const user = StarsSession.get()?.user;
+            if (!user) return;
+            const isStaff = user.role === 'ProgramStaff' || !!user.isCounselor || !!user.is_counselor;
+            const isMentor = user.role === 'Mentor';
 
-    const hub = document.getElementById('mentor-safeguarding-hub');
-    const backup = document.getElementById('mentor-backup-surveys-footer');
-    const toggle = document.getElementById('counselor-survey-toggle');
-    const surveySection = document.getElementById('survey');
+            const hub = document.getElementById('mentor-safeguarding-hub');
+            const backup = document.getElementById('mentor-backup-surveys-footer');
+            const toggle = document.getElementById('counselor-survey-toggle');
+            const surveySection = document.getElementById('survey');
 
-    if (hub) hub.style.display = isMentor ? 'block' : 'none';
-    if (backup) backup.style.display = isMentor ? 'block' : 'none';
-    if (toggle) toggle.style.display = isStaff ? 'flex' : 'none';
+            if (hub) hub.style.display = isMentor ? 'block' : 'none';
+            if (backup) backup.style.display = isMentor ? 'block' : 'none';
+            if (toggle) toggle.style.display = isStaff ? 'flex' : 'none';
 
-    if (isMentor && hub && surveySection && backup) {
-        // PROMOTED REORDER: Banner (Header) -> Hub (Safeguarding) -> Backup (Links) -> Rest
-        const banner = surveySection.querySelector('.banner-block');
-        if (banner) {
-            surveySection.prepend(banner);
-            banner.insertAdjacentElement('afterend', hub);
-            hub.insertAdjacentElement('afterend', backup);
-        }
-        hub.style.marginTop = '1.5rem';
-        backup.style.marginTop = '1.5rem';
-        // Populating safeguarding selector
-        const selCont = document.getElementById('emergency-contact-selector');
-        if (selCont) {
-            const pairs = window.DASH_DATA?.pairs || [];
-            selCont.innerHTML = `<select id="emergency-mentee-select" style="padding:1rem; border-radius:12px; border:1.5px solid #ffdde1; background:white; font-weight:700; color:#b91c1c;">
+            if (isMentor && hub && surveySection && backup) {
+                // PROMOTED REORDER: Banner (Header) -> Hub (Safeguarding) -> Backup (Links) -> Rest
+                const banner = surveySection.querySelector('.banner-block');
+                if (banner) {
+                    surveySection.prepend(banner);
+                    banner.insertAdjacentElement('afterend', hub);
+                    hub.insertAdjacentElement('afterend', backup);
+                }
+                hub.style.marginTop = '1.5rem';
+                backup.style.marginTop = '1.5rem';
+                // Populating safeguarding selector
+                const selCont = document.getElementById('emergency-contact-selector');
+                if (selCont) {
+                    const pairs = window.DASH_DATA?.pairs || [];
+                    selCont.innerHTML = `<select id="emergency-mentee-select" style="padding:1rem; border-radius:12px; border:1.5px solid #ffdde1; background:white; font-weight:700; color:#b91c1c;">
                 ${pairs.map(p => `<option value="${p.mentee_name || p.name}">${p.mentee_name || p.name}</option>`).join('')}
             </select>`;
-        }
-    }
+                }
+            }
 
-    try {
-        const fetchDays = parseInt(window.CURRENT_ANALYTICS_DAYS) || 30;
-        const fil = window.SURVEY_FILTERS;
-        const res = await fetch(`/api/survey/analytics?days=${fetchDays}&mode=${fil.mode || 'self'}&role=${fil.role || 'All'}`, {
-            headers: { 'Authorization': `Bearer ${StarsSession.get().token}` }
-        });
-        if (!res.ok) throw new Error("Backend server error");
-        window.SURVEY_DATA = await res.json();
-    } catch (e) {
-        console.error("Survey fetch fail:", e);
-        window.SURVEY_DATA = { surveys: [], trends: [] };
-        const cont = document.getElementById('survey-responses-container');
-        if (cont) cont.innerHTML = `<div style="text-align:center; padding:3rem; color:#e84393; font-weight:700;">Unable to connect to Survey Analytics. Please ensure the backend is running.</div>`;
-    } finally {
-        window.renderSurveyFilters();
-        window.applySurveyFilters();
-    }
-};
+            try {
+                const fetchDays = parseInt(window.CURRENT_ANALYTICS_DAYS) || 30;
+                const fil = window.SURVEY_FILTERS;
+                const res = await fetch(`/api/survey/analytics?days=${fetchDays}&mode=${fil.mode || 'self'}&role=${fil.role || 'All'}`, {
+                    headers: { 'Authorization': `Bearer ${StarsSession.get().token}` }
+                });
+                if (!res.ok) throw new Error("Backend server error");
+                window.SURVEY_DATA = await res.json();
+            } catch (e) {
+                console.error("Survey fetch fail:", e);
+                window.SURVEY_DATA = { surveys: [], trends: [] };
+                const cont = document.getElementById('survey-responses-container');
+                if (cont) cont.innerHTML = `<div style="text-align:center; padding:3rem; color:#e84393; font-weight:700;">Unable to connect to Survey Analytics. Please ensure the backend is running.</div>`;
+            } finally {
+                window.renderSurveyFilters();
+                window.applySurveyFilters();
+            }
+        };
 
-window.setSurveyFilter = function (k, v) {
-    window.SURVEY_FILTERS[k] = v;
-    // If we switch modes or audiences, we need a fresh authoritative fetch from partitioned backend
-    if (k === 'mode' || k === 'role') {
-        window.renderSurveyCenter();
-    } else {
-        window.renderSurveyFilters();
-        window.applySurveyFilters();
-    }
-};
+        window.setSurveyFilter = function (k, v) {
+            window.SURVEY_FILTERS[k] = v;
+            // If we switch modes or audiences, we need a fresh authoritative fetch from partitioned backend
+            if (k === 'mode' || k === 'role') {
+                window.renderSurveyCenter();
+            } else {
+                window.renderSurveyFilters();
+                window.applySurveyFilters();
+            }
+        };
 
-window.initSurveyCenter = window.renderSurveyCenter;
+        window.initSurveyCenter = window.renderSurveyCenter;
 
-window.renderSurveyFilters = function () {
-    const filterCont = document.getElementById('survey-filters');
-    if (!filterCont) return;
-    console.log("SURVEY SYSTEM: INITIALIZING FILTERS v5.0");
-    const session = StarsSession.get();
-    const currentUser = session?.user;
-    const isProgramStaff = currentUser?.role === 'ProgramStaff' || !!currentUser?.isCounselor || !!currentUser?.is_counselor;
-    const isSurveyMentor = currentUser?.role === 'Mentor';
-    const fil = window.SURVEY_FILTERS;
+        window.renderSurveyFilters = function () {
+            const filterCont = document.getElementById('survey-filters');
+            if (!filterCont) return;
+            console.log("SURVEY SYSTEM: INITIALIZING FILTERS v5.0");
+            const session = StarsSession.get();
+            const currentUser = session?.user;
+            const isProgramStaff = currentUser?.role === 'ProgramStaff' || !!currentUser?.isCounselor || !!currentUser?.is_counselor;
+            const isSurveyMentor = currentUser?.role === 'Mentor';
+            const fil = window.SURVEY_FILTERS;
 
-    let filterHtml = '';
+            let filterHtml = '';
 
-    if (isProgramStaff) {
-        // 1. Counselor: Multi-Survey Toggle (Mentor vs Mentee responses)
-        filterHtml += `
+            if (isProgramStaff) {
+                // 1. Counselor: Multi-Survey Toggle (Mentor vs Mentee responses)
+                filterHtml += `
         <div style="display: flex; flex-direction: column; gap: 1rem; width: 100%; margin-bottom: 2rem;">
             <div style="font-size: 0.85rem; color: #94a3b8; font-weight: 800; text-transform: uppercase;">Toggle Audience</div>
             <div style="display: flex; gap: 0.5rem; justify-content: flex-start;">
@@ -654,11 +656,11 @@ window.renderSurveyFilters = function () {
                 </select>
             </div>
         </div>`;
-    }
+            }
 
-    if (isSurveyMentor) {
-        // 2. Mentor: My Data vs. Mentee Data
-        filterHtml += `
+            if (isSurveyMentor) {
+                // 2. Mentor: My Data vs. Mentee Data
+                filterHtml += `
         <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; width: 100%;">
              <div style="display: flex; background: #fff1f6; padding: 0.4rem; border-radius: 16px; border: 1.5px solid #fce4ec;">
                 <button onclick="window.setSurveyFilter('mode', 'self')" 
@@ -669,11 +671,11 @@ window.renderSurveyFilters = function () {
                     style="border:none; margin:0; border-radius:12px; font-weight:700;">Mentee Data</button>
             </div>`;
 
-        // Dynamic Mentee List if mode is 'mentees'
-        if (fil.mode === 'mentees') {
-            const myPairs = window.DASH_DATA?.pairs || [];
-            if (myPairs.length > 0) {
-                filterHtml += `
+                // Dynamic Mentee List if mode is 'mentees'
+                if (fil.mode === 'mentees') {
+                    const myPairs = window.DASH_DATA?.pairs || [];
+                    if (myPairs.length > 0) {
+                        filterHtml += `
                 <div style="display: flex; align-items: center; gap: 0.5rem;">
                     <span style="font-size: 0.8rem; color: #e84393; font-weight: 800;">VIEW MENTEE:</span>
                     <select onchange="window.setSurveyFilter('mentee', this.value)" 
@@ -684,67 +686,67 @@ window.renderSurveyFilters = function () {
                         `).join('')}
                     </select>
                 </div>`;
+                    }
+                }
+                filterHtml += `</div>`;
             }
-        }
-        filterHtml += `</div>`;
-    }
 
-    filterCont.innerHTML = filterHtml;
-};
+            filterCont.innerHTML = filterHtml;
+        };
 
-window.applySurveyFilters = function () {
-    const rawData = window.SURVEY_DATA?.surveys || [];
-    const fil = window.SURVEY_FILTERS;
-    const activeUser = StarsSession.get()?.user;
-    const isStaffRole = activeUser?.role === 'ProgramStaff' || !!activeUser?.isCounselor || !!activeUser?.is_counselor;
-    const isMentorRole = activeUser?.role === 'Mentor';
+        window.applySurveyFilters = function () {
+            const rawData = window.SURVEY_DATA?.surveys || [];
+            const fil = window.SURVEY_FILTERS;
+            const activeUser = StarsSession.get()?.user;
+            const isStaffRole = activeUser?.role === 'ProgramStaff' || !!activeUser?.isCounselor || !!activeUser?.is_counselor;
+            const isMentorRole = activeUser?.role === 'Mentor';
 
-    const filteredResponses = rawData.filter(s => {
-        // Staff Filtering
-        if (isStaffRole) {
-            const auditRole = String(s.role || '').trim().toLowerCase();
-            const filterRole = String(fil.role || '').trim().toLowerCase();
-            const roleMatch = (fil.role === 'All' || auditRole === filterRole);
-            const typeMatch = (fil.type === 'All' || s.type === fil.type);
-            return roleMatch && typeMatch;
-        }
+            const filteredResponses = rawData.filter(s => {
+                // Staff Filtering
+                if (isStaffRole) {
+                    const auditRole = String(s.role || '').trim().toLowerCase();
+                    const filterRole = String(fil.role || '').trim().toLowerCase();
+                    const roleMatch = (fil.role === 'All' || auditRole === filterRole);
+                    const typeMatch = (fil.type === 'All' || s.type === fil.type);
+                    return roleMatch && typeMatch;
+                }
 
-        // Mentor Filtering
-        if (isMentorRole) {
-            const isSelf = (s.email || s.user_email) === activeUser.email;
-            if (fil.mode === 'self') {
-                return isSelf;
-            } else {
-                // Mentee Data view
-                if (isSelf) return false;
-                const menteeMatch = (fil.mentee === 'All' || s.name === fil.mentee);
-                return menteeMatch;
-            }
-        }
+                // Mentor Filtering
+                if (isMentorRole) {
+                    const isSelf = (s.email || s.user_email) === activeUser.email;
+                    if (fil.mode === 'self') {
+                        return isSelf;
+                    } else {
+                        // Mentee Data view
+                        if (isSelf) return false;
+                        const menteeMatch = (fil.mentee === 'All' || s.name === fil.mentee);
+                        return menteeMatch;
+                    }
+                }
 
-        return true;
-    });
+                return true;
+            });
 
-    const surveyResponseContainer = document.getElementById('survey-responses-container');
-    if (surveyResponseContainer) {
-        surveyResponseContainer.innerHTML = filteredResponses.map(s => {
-            const emergencyKeywords = ['emergency', 'urgent', 'safety', 'danger', 'harm', 'help', 'immediate', 'safeguarding'];
+            const surveyResponseContainer = document.getElementById('survey-responses-container');
+            if (surveyResponseContainer) {
+                surveyResponseContainer.innerHTML = filteredResponses.map(s => {
+                    const emergencyKeywords = ['emergency', 'urgent', 'safety', 'danger', 'harm', 'help', 'immediate', 'safeguarding'];
 
-            // AUTHORITATIVE SCAN: Check all responses in the bundle for emergency keywords
-            const bundleText = s.responses.map(r => (r.q || '') + ' ' + (r.a || '')).join(' ').toLowerCase();
-            const containsEmergency = emergencyKeywords.some(k => bundleText.includes(k));
+                    // AUTHORITATIVE SCAN: Check all responses in the bundle for emergency keywords
+                    const bundleText = s.responses.map(r => (r.q || '') + ' ' + (r.a || '')).join(' ').toLowerCase();
+                    const containsEmergency = emergencyKeywords.some(k => bundleText.includes(k));
 
-            const cardBg = containsEmergency ? '#fff8f8' : 'white';
-            const cardBorder = containsEmergency ? '#ef4444' : '#fce4ec';
+                    const cardBg = containsEmergency ? '#fff8f8' : 'white';
+                    const cardBorder = containsEmergency ? '#ef4444' : '#fce4ec';
 
-            const responseHtml = s.responses.map(r => `
+                    const responseHtml = s.responses.map(r => `
                 <div style="margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.5rem;">
                     <div style="font-weight:700; margin-bottom:0.2rem; font-size: 0.9rem;">${r.q}</div>
                     <div style="color:#475569; font-size: 0.95rem;">${r.a}</div>
                 </div>
             `).join('');
 
-            return `
+                    return `
             <div style="background:${cardBg}; border-radius:24px; padding:2rem; border:2px solid ${cardBorder}; margin-bottom:1.5rem; position: relative;">
                 ${containsEmergency ? '<div style="position:absolute; top:1.5rem; right:2rem; background:#ef4444; color:white; padding:0.4rem 0.8rem; border-radius:8px; font-size:0.65rem; font-weight:800; text-transform:uppercase; letter-spacing:0.5px;">Safeguarding Alert</div>' : ''}
                 
@@ -775,67 +777,67 @@ window.applySurveyFilters = function () {
                     ${responseHtml}
                 </div>
             </div>`;
-        }).join('') || '<div style="text-align:center; padding:3rem; color:#94a3b8;">No matching responses found for current criteria.</div>';
-    }
-};
+                }).join('') || '<div style="text-align:center; padding:3rem; color:#94a3b8;">No matching responses found for current criteria.</div>';
+            }
+        };
 
-// Surgical Cleanup Complete - Redundant definitions removed.
+        // Surgical Cleanup Complete - Redundant definitions removed.
 
-window.updateAnalyticsTimeframe = function (days) {
-    window.CURRENT_ANALYTICS_DAYS = parseInt(days) || 30;
-    document.querySelectorAll('#analytics-timeline-filters .pairing-pill').forEach(btn => {
-        const t = btn.textContent;
-        const m = (days === 7 && t.includes('1 Week')) || (days === 14 && t.includes('2 Weeks')) || (days === 21 && t.includes('3 Weeks')) || (days === 30 && t.includes('30 Days')) || (days === 90 && t.includes('90 Days'));
-        btn.classList.toggle('active', !!m);
-    });
-    window.renderSurveyCenter();
-};
+        window.updateAnalyticsTimeframe = function (days) {
+            window.CURRENT_ANALYTICS_DAYS = parseInt(days) || 30;
+            document.querySelectorAll('#analytics-timeline-filters .pairing-pill').forEach(btn => {
+                const t = btn.textContent;
+                const m = (days === 7 && t.includes('1 Week')) || (days === 14 && t.includes('2 Weeks')) || (days === 21 && t.includes('3 Weeks')) || (days === 30 && t.includes('30 Days')) || (days === 90 && t.includes('90 Days'));
+                btn.classList.toggle('active', !!m);
+            });
+            window.renderSurveyCenter();
+        };
 
-// 6. Safeguarding
-window.triggerEmergencyOutlook = function () {
-    const sel = document.getElementById('emergency-mentee-select');
-    const name = sel ? sel.value : (window.DASH_DATA?.pairs[0]?.mentee_name || 'My Mentee');
-    const subject = encodeURIComponent(`STARS Emergency Safeguarding Request - ${name}`);
-    const body = encodeURIComponent(`Hello Counselors,\n\nI am requesting an immediate safeguarding check for ${name}.\n\nPlease review the recent survey responses and reach out.\n\nBest regards,\nSTARS Mentor`);
-    window.location.href = `mailto:counselors@naischool.ae?subject=${subject}&body=${body}`;
-};
+        // 6. Safeguarding
+        window.triggerEmergencyOutlook = function () {
+            const sel = document.getElementById('emergency-mentee-select');
+            const name = sel ? sel.value : (window.DASH_DATA?.pairs[0]?.mentee_name || 'My Mentee');
+            const subject = encodeURIComponent(`STARS Emergency Safeguarding Request - ${name}`);
+            const body = encodeURIComponent(`Hello Counselors,\n\nI am requesting an immediate safeguarding check for ${name}.\n\nPlease review the recent survey responses and reach out.\n\nBest regards,\nSTARS Mentor`);
+            window.location.href = `mailto:counselors@naischool.ae?subject=${subject}&body=${body}`;
+        };
 
-window.copySafetyPrompt = function (e) {
-    const sel = document.getElementById('emergency-mentee-select');
-    const name = sel ? sel.value : (window.DASH_DATA?.pairs[0]?.mentee_name || "[mentee's name]");
-    const text = `Hello Counselors, I am requesting an immediate safeguarding check for ${name}. Please review the recent survey responses.`;
-    navigator.clipboard.writeText(text).then(() => {
-        const btn = e.target;
-        const old = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(() => btn.textContent = old, 2000);
-    });
-};
+        window.copySafetyPrompt = function (e) {
+            const sel = document.getElementById('emergency-mentee-select');
+            const name = sel ? sel.value : (window.DASH_DATA?.pairs[0]?.mentee_name || "[mentee's name]");
+            const text = `Hello Counselors, I am requesting an immediate safeguarding check for ${name}. Please review the recent survey responses.`;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = e.target;
+                const old = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = old, 2000);
+            });
+        };
 
-// 7. Messaging
-window.renderMessages = function (messages) {
-    const target = document.getElementById('message-target-pills');
-    if (!target) return;
-    const user = StarsSession.get()?.user;
-    if (!user) return;
-    const isCounselor = !!user.isCounselor || !!user.is_counselor;
-    const isStaff = user.role === 'ProgramStaff' || isCounselor;
-    const pairs = window.DASH_DATA?.pairs || [];
+        // 7. Messaging
+        window.renderMessages = function (messages) {
+            const target = document.getElementById('message-target-pills');
+            if (!target) return;
+            const user = StarsSession.get()?.user;
+            if (!user) return;
+            const isCounselor = !!user.isCounselor || !!user.is_counselor;
+            const isStaff = user.role === 'ProgramStaff' || isCounselor;
+            const pairs = window.DASH_DATA?.pairs || [];
 
-    // Remove legacy placeholder elements
-    const placeholder = document.getElementById('message-placeholder-text');
-    if (placeholder) placeholder.style.display = 'none';
+            // Remove legacy placeholder elements
+            const placeholder = document.getElementById('message-placeholder-text');
+            if (placeholder) placeholder.style.display = 'none';
 
-    if (isStaff) {
-        // Counselor messenger list (Screenshot 1 parity: grouped headers + yellow cards)
-        const grouped = {};
-        pairs.forEach(p => {
-            const mName = p.mentor_name || 'Unassigned Mentor';
-            if (!grouped[mName]) grouped[mName] = [];
-            grouped[mName].push(p);
-        });
+            if (isStaff) {
+                // Counselor messenger list (Screenshot 1 parity: grouped headers + yellow cards)
+                const grouped = {};
+                pairs.forEach(p => {
+                    const mName = p.mentor_name || 'Unassigned Mentor';
+                    if (!grouped[mName]) grouped[mName] = [];
+                    grouped[mName].push(p);
+                });
 
-        target.innerHTML = Object.keys(grouped).map(mentor => `
+                target.innerHTML = Object.keys(grouped).map(mentor => `
             <div class="pair-label" style="color: #64748b; font-size: 0.75rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase;">MENTOR: ${mentor}</div>
             ${grouped[mentor].map(p => `
                 <div class="mentee-card-yellow" onclick="window.switchChat('${p.pair_id}', '${p.mentee_name}')" style="margin-bottom: 0.75rem; padding: 1rem 1.25rem;">
@@ -848,294 +850,294 @@ window.renderMessages = function (messages) {
                 </div>
             `).join('')}
         `).join('');
-    } else if (user.role === 'Mentee') {
-        // Mentee: Auto-open active chat, hide selector (Final Polish)
-        document.getElementById('message-selector-container').style.display = 'none';
-        if (pairs.length > 0) {
-            const p = pairs[0];
-            const partnerName = p.mentor_name || p.name;
-            window.switchChat(p.pair_id, partnerName);
-        }
-        target.innerHTML = '';
-    } else {
-        // Mentor view
-        target.innerHTML = pairs.map(p => {
-            const name = (user.role === 'Mentor' ? p.mentee_name : p.mentor_name) || p.name;
-            const subtext = user.role === 'Mentor' ? (p.mentee_email || '') : (p.mentor_email || '');
-            return `<div class="message-contact-card" onclick="window.switchChat('${p.pair_id}', '${name}')" style="background:#fffde7; padding:1.2rem; border-radius:20px; border:2px solid #fef08a; cursor:pointer; margin-bottom:0.8rem; display:flex; align-items:center; gap:1rem;">
+            } else if (user.role === 'Mentee') {
+                // Mentee: Auto-open active chat, hide selector (Final Polish)
+                document.getElementById('message-selector-container').style.display = 'none';
+                if (pairs.length > 0) {
+                    const p = pairs[0];
+                    const partnerName = p.mentor_name || p.name;
+                    window.switchChat(p.pair_id, partnerName);
+                }
+                target.innerHTML = '';
+            } else {
+                // Mentor view
+                target.innerHTML = pairs.map(p => {
+                    const name = (user.role === 'Mentor' ? p.mentee_name : p.mentor_name) || p.name;
+                    const subtext = user.role === 'Mentor' ? (p.mentee_email || '') : (p.mentor_email || '');
+                    return `<div class="message-contact-card" onclick="window.switchChat('${p.pair_id}', '${name}')" style="background:#fffde7; padding:1.2rem; border-radius:20px; border:2px solid #fef08a; cursor:pointer; margin-bottom:0.8rem; display:flex; align-items:center; gap:1rem;">
                 <div style="background:#e84393; color:white; width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800;">${name.charAt(0)}</div>
                 <div>
                    <div style="font-weight:800; color:#e84393;">${name}</div>
                    <div style="font-size: 0.8rem; color: #e84393; opacity: 0.8; font-weight: 600;">${subtext}</div>
                 </div>
             </div>`;
-        }).join('');
-    }
-};
-
-window.switchChat = function (id, name) {
-    window.CURRENT_CHAT_PAIR = id;
-    document.getElementById('message-selector-container').style.display = 'none';
-    const active = document.getElementById('active-chat-container');
-    active.style.display = 'flex';
-    document.getElementById('chat-header-name').textContent = name;
-
-    // Final Screenshot Parity: Remove generic headers & instruction text
-    const headerTitle = active.querySelector('h2');
-    if (headerTitle) headerTitle.style.display = 'none';
-    const subtitle = document.getElementById('chat-header-subtitle');
-    if (subtitle) subtitle.style.display = 'none'; // Clean up selector text
-
-    // Gating for Counselors: Remove send interface (Screenshot 4 request)
-    const user = StarsSession.get()?.user;
-    const isStaff = user?.role === 'ProgramStaff' || !!user?.isCounselor || !!user?.is_counselor;
-    const sendBox = document.getElementById('chat-input-container');
-    if (sendBox) sendBox.style.display = isStaff ? 'none' : 'flex';
-
-    const header = document.getElementById('general-chat-header');
-    if (!document.getElementById('chat-exit-btn')) {
-        const btn = document.createElement('button');
-        btn.id = 'chat-exit-btn';
-        const user = StarsSession.get()?.user;
-        const isMentee = user?.role === 'Mentee';
-        btn.textContent = '← Exit Chat';
-        btn.style.display = isMentee ? 'none' : 'block'; // ONLY hide for mentees (Final Fix)
-        btn.className = 'btn-magenta';
-        btn.style.padding = '0.5rem 1rem';
-        btn.style.marginRight = '1rem';
-        btn.onclick = window.exitChat;
-        header.prepend(btn);
-    }
-    window.syncChat();
-};
-
-window.exitChat = function () {
-    window.CURRENT_CHAT_PAIR = null;
-    document.getElementById('message-selector-container').style.display = 'block';
-    document.getElementById('active-chat-container').style.display = 'none';
-};
-
-window.syncChat = async function () {
-    if (!window.CURRENT_CHAT_PAIR) return;
-    const res = await fetch(`/api/messages?pair_id=${window.CURRENT_CHAT_PAIR}`, { headers: { 'Authorization': `Bearer ${StarsSession.get().token}` } });
-    const msgs = await res.json();
-    const body = document.getElementById('chat-body-content');
-    if (body) {
-        const u = StarsSession.get().user;
-        const isCounselor = !!u.isCounselor || !!u.is_counselor || u.role === 'ProgramStaff';
-
-        // Find the current pair to identify mentor/mentee roles for counselor view
-        const currentPair = window.DASH_DATA?.pairs?.find(p => String(p.pair_id) === String(window.CURRENT_CHAT_PAIR));
-
-        body.innerHTML = msgs.map(m => {
-            const isMe = m.sender === u.email;
-            let bubbleClass = isMe ? 'sent' : 'received';
-            let label = '';
-
-            if (isCounselor && currentPair) {
-                const isMentor = m.sender === currentPair.mentor_email;
-                const isMentee = m.sender === currentPair.mentee_email;
-
-                // USER REQUEST: Mentor on right (sent style), Mentee on left (received style)
-                bubbleClass = isMentor ? 'sent' : 'received';
-
-                // Add explicit labels for counselor clarity
-                const roleLabel = isMentor ? 'Mentor' : 'Mentee';
-                const senderName = isMentor ? currentPair.mentor_name : currentPair.mentee_name;
-                label = `<div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase; align-self: ${isMentor ? 'flex-end' : 'flex-start'}">${roleLabel}: ${senderName || 'User'}</div>`;
+                }).join('');
             }
+        };
 
-            return `
+        window.switchChat = function (id, name) {
+            window.CURRENT_CHAT_PAIR = id;
+            document.getElementById('message-selector-container').style.display = 'none';
+            const active = document.getElementById('active-chat-container');
+            active.style.display = 'flex';
+            document.getElementById('chat-header-name').textContent = name;
+
+            // Final Screenshot Parity: Remove generic headers & instruction text
+            const headerTitle = active.querySelector('h2');
+            if (headerTitle) headerTitle.style.display = 'none';
+            const subtitle = document.getElementById('chat-header-subtitle');
+            if (subtitle) subtitle.style.display = 'none'; // Clean up selector text
+
+            // Gating for Counselors: Remove send interface (Screenshot 4 request)
+            const user = StarsSession.get()?.user;
+            const isStaff = user?.role === 'ProgramStaff' || !!user?.isCounselor || !!user?.is_counselor;
+            const sendBox = document.getElementById('chat-input-container');
+            if (sendBox) sendBox.style.display = isStaff ? 'none' : 'flex';
+
+            const header = document.getElementById('general-chat-header');
+            if (!document.getElementById('chat-exit-btn')) {
+                const btn = document.createElement('button');
+                btn.id = 'chat-exit-btn';
+                const user = StarsSession.get()?.user;
+                const isMentee = user?.role === 'Mentee';
+                btn.textContent = '← Exit Chat';
+                btn.style.display = isMentee ? 'none' : 'block'; // ONLY hide for mentees (Final Fix)
+                btn.className = 'btn-magenta';
+                btn.style.padding = '0.5rem 1rem';
+                btn.style.marginRight = '1rem';
+                btn.onclick = window.exitChat;
+                header.prepend(btn);
+            }
+            window.syncChat();
+        };
+
+        window.exitChat = function () {
+            window.CURRENT_CHAT_PAIR = null;
+            document.getElementById('message-selector-container').style.display = 'block';
+            document.getElementById('active-chat-container').style.display = 'none';
+        };
+
+        window.syncChat = async function () {
+            if (!window.CURRENT_CHAT_PAIR) return;
+            const res = await fetch(`/api/messages?pair_id=${window.CURRENT_CHAT_PAIR}`, { headers: { 'Authorization': `Bearer ${StarsSession.get().token}` } });
+            const msgs = await res.json();
+            const body = document.getElementById('chat-body-content');
+            if (body) {
+                const u = StarsSession.get().user;
+                const isCounselor = !!u.isCounselor || !!u.is_counselor || u.role === 'ProgramStaff';
+
+                // Find the current pair to identify mentor/mentee roles for counselor view
+                const currentPair = window.DASH_DATA?.pairs?.find(p => String(p.pair_id) === String(window.CURRENT_CHAT_PAIR));
+
+                body.innerHTML = msgs.map(m => {
+                    const isMe = m.sender === u.email;
+                    let bubbleClass = isMe ? 'sent' : 'received';
+                    let label = '';
+
+                    if (isCounselor && currentPair) {
+                        const isMentor = m.sender === currentPair.mentor_email;
+                        const isMentee = m.sender === currentPair.mentee_email;
+
+                        // USER REQUEST: Mentor on right (sent style), Mentee on left (received style)
+                        bubbleClass = isMentor ? 'sent' : 'received';
+
+                        // Add explicit labels for counselor clarity
+                        const roleLabel = isMentor ? 'Mentor' : 'Mentee';
+                        const senderName = isMentor ? currentPair.mentor_name : currentPair.mentee_name;
+                        label = `<div style="font-size: 0.65rem; font-weight: 800; color: #94a3b8; margin-bottom: 0.2rem; text-transform: uppercase; align-self: ${isMentor ? 'flex-end' : 'flex-start'}">${roleLabel}: ${senderName || 'User'}</div>`;
+                    }
+
+                    return `
                 <div style="display: flex; flex-direction: column; width: 100%; align-items: ${bubbleClass === 'sent' ? 'flex-end' : 'flex-start'}">
                     ${label}
                     <div class="chat-bubble ${bubbleClass}">
                         ${m.message}
                     </div>
                 </div>`;
-        }).join('');
-        body.scrollTop = body.scrollHeight;
-    }
-};
+                }).join('');
+                body.scrollTop = body.scrollHeight;
+            }
+        };
 
-window.sendMessage = async function (e) {
-    if (e) e.preventDefault();
-    const input = document.getElementById('chat-input');
-    if (!input.value || !window.CURRENT_CHAT_PAIR) return;
-    const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` }, body: JSON.stringify({ pair_id: window.CURRENT_CHAT_PAIR, message: input.value }) });
-    if (res.ok) { input.value = ''; window.syncChat(); }
-};
+        window.sendMessage = async function (e) {
+            if (e) e.preventDefault();
+            const input = document.getElementById('chat-input');
+            if (!input.value || !window.CURRENT_CHAT_PAIR) return;
+            const res = await fetch('/api/messages', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` }, body: JSON.stringify({ pair_id: window.CURRENT_CHAT_PAIR, message: input.value }) });
+            if (res.ok) { input.value = ''; window.syncChat(); }
+        };
 
-// 8. Analytics
-window.renderSurveyTrends = function () {
-    const ctx1 = document.getElementById('sentimentBarChart')?.getContext('2d');
-    const ctx2 = document.getElementById('volumeTrendChart')?.getContext('2d');
-    const data = window.SURVEY_DATA;
-    if (!ctx1 || !ctx2 || !data) return;
+        // 8. Analytics
+        window.renderSurveyTrends = function () {
+            const ctx1 = document.getElementById('sentimentBarChart')?.getContext('2d');
+            const ctx2 = document.getElementById('volumeTrendChart')?.getContext('2d');
+            const data = window.SURVEY_DATA;
+            if (!ctx1 || !ctx2 || !data) return;
 
-    if (window._chart1) window._chart1.destroy();
-    if (window._chart2) window._chart2.destroy();
+            if (window._chart1) window._chart1.destroy();
+            if (window._chart2) window._chart2.destroy();
 
-    // Chart 1: Real Sentiment (Mood vs Impact)
-    window._chart1 = new Chart(ctx1, {
-        type: 'bar',
-        data: {
-            labels: ['Mood Today', 'Support Level', 'Overall Impact'],
-            datasets: [{
-                data: [data.mood_avg || 0, data.help_avg || 0, ((data.mood_avg + data.help_avg) / 2) || 0],
-                backgroundColor: '#e84393'
-            }]
-        },
-        options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 5 } } }
-    });
+            // Chart 1: Real Sentiment (Mood vs Impact)
+            window._chart1 = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: ['Mood Today', 'Support Level', 'Overall Impact'],
+                    datasets: [{
+                        data: [data.mood_avg || 0, data.help_avg || 0, ((data.mood_avg + data.help_avg) / 2) || 0],
+                        backgroundColor: '#e84393'
+                    }]
+                },
+                options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, max: 5 } } }
+            });
 
-    // Chart 2: Real Volume Trends
-    const labels = (data.volume_trend || []).map(t => t.date);
-    const counts = (data.volume_trend || []).map(t => t.count);
-    window._chart2 = new Chart(ctx2, {
-        type: 'line',
-        data: {
-            labels: labels.length ? labels : ['No Data'],
-            datasets: [{
-                label: 'Submissions',
-                data: counts.length ? counts : [0],
-                borderColor: '#e84393',
-                backgroundColor: 'rgba(232, 67, 147, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
-    });
-};
+            // Chart 2: Real Volume Trends
+            const labels = (data.volume_trend || []).map(t => t.date);
+            const counts = (data.volume_trend || []).map(t => t.count);
+            window._chart2 = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: labels.length ? labels : ['No Data'],
+                    datasets: [{
+                        label: 'Submissions',
+                        data: counts.length ? counts : [0],
+                        borderColor: '#e84393',
+                        backgroundColor: 'rgba(232, 67, 147, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            });
+        };
 
-// 9. Lifecycle
-window.addEventListener('load', () => {
-    log("STARS Authority ONLINE.");
-    if (StarsSession.get()) window.showAuthForm('dash');
-    else window.showAuthForm('menu');
-});
+        // 9. Lifecycle
+        window.addEventListener('load', () => {
+            log("STARS Authority ONLINE.");
+            if (StarsSession.get()) window.showAuthForm('dash');
+            else window.showAuthForm('menu');
+        });
 
-// Bindings
-window.openScheduleModal = (n, p) => {
-    document.getElementById('schedule-modal-overlay').style.display = 'flex';
-    document.getElementById('selected-partner-name').textContent = n;
-    window.SELECTED_PAIR_ID = p;
-    window.updateCalendar();
+        // Bindings
+        window.openScheduleModal = (n, p) => {
+            document.getElementById('schedule-modal-overlay').style.display = 'flex';
+            document.getElementById('selected-partner-name').textContent = n;
+            window.SELECTED_PAIR_ID = p;
+            window.updateCalendar();
 
-    // Privacy: Default to Mentee Only for Counselor sessions
-    const user = StarsSession.get()?.user;
-    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
-    const participantsWrap = document.getElementById('counselor-participants-wrap');
-    if (participantsWrap) {
-        participantsWrap.style.display = isCounselor ? 'block' : 'none';
-        document.getElementById('meeting-participants-select').value = 'Mentee Only';
-    }
+            // Privacy: Default to Mentee Only for Counselor sessions
+            const user = StarsSession.get()?.user;
+            const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
+            const participantsWrap = document.getElementById('counselor-participants-wrap');
+            if (participantsWrap) {
+                participantsWrap.style.display = isCounselor ? 'block' : 'none';
+                document.getElementById('meeting-participants-select').value = 'Mentee Only';
+            }
 
-    window.switchScheduleStep(1);
-};
-window.closeScheduleModal = () => document.getElementById('schedule-modal-overlay').style.display = 'none';
-window.switchScheduleStep = (s) => { document.getElementById('schedule-step-1').style.display = (s === 1 ? 'block' : 'none'); document.getElementById('schedule-step-2').style.display = (s === 2 ? 'block' : 'none'); };
-window.updateCalendar = () => {
-    const cont = document.getElementById('calendar-days');
-    if (!cont) return;
-    cont.innerHTML = '';
-    for (let d = 1; d <= 30; d++) {
-        const div = document.createElement('div');
-        div.className = 'calendar-day';
-        div.textContent = d;
-        div.onclick = () => { window.SELECTED_DATE = `2026-04-${d.toString().padStart(2, '0')}`; window.switchScheduleStep(2); };
-        cont.appendChild(div);
-    }
-};
-window.submitSchedule = async () => {
-    const time = document.getElementById('schedule-time-input').value;
-    const link = document.getElementById('schedule-link-input').value;
-    const user = StarsSession.get()?.user;
-    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
+            window.switchScheduleStep(1);
+        };
+        window.closeScheduleModal = () => document.getElementById('schedule-modal-overlay').style.display = 'none';
+        window.switchScheduleStep = (s) => { document.getElementById('schedule-step-1').style.display = (s === 1 ? 'block' : 'none'); document.getElementById('schedule-step-2').style.display = (s === 2 ? 'block' : 'none'); };
+        window.updateCalendar = () => {
+            const cont = document.getElementById('calendar-days');
+            if (!cont) return;
+            cont.innerHTML = '';
+            for (let d = 1; d <= 30; d++) {
+                const div = document.createElement('div');
+                div.className = 'calendar-day';
+                div.textContent = d;
+                div.onclick = () => { window.SELECTED_DATE = `2026-04-${d.toString().padStart(2, '0')}`; window.switchScheduleStep(2); };
+                cont.appendChild(div);
+            }
+        };
+        window.submitSchedule = async () => {
+            const time = document.getElementById('schedule-time-input').value;
+            const link = document.getElementById('schedule-link-input').value;
+            const user = StarsSession.get()?.user;
+            const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
 
-    let participants = '';
-    if (isCounselor) {
-        const mode = document.getElementById('meeting-participants-select').value;
-        const myPairs = window.DASH_DATA?.pairs || [];
-        const pair = myPairs.find(p => p.pair_id === window.SELECTED_PAIR_ID);
-        if (pair) {
-            participants = user.email; // Host is always in
-            if (mode === 'Mentee Only') participants += `,${pair.mentee_email || pair.email}`;
-            else participants += `,${pair.mentee_email || pair.email},${pair.mentor_email}`;
-        }
-    }
+            let participants = '';
+            if (isCounselor) {
+                const mode = document.getElementById('meeting-participants-select').value;
+                const myPairs = window.DASH_DATA?.pairs || [];
+                const pair = myPairs.find(p => p.pair_id === window.SELECTED_PAIR_ID);
+                if (pair) {
+                    participants = user.email; // Host is always in
+                    if (mode === 'Mentee Only') participants += `,${pair.mentee_email || pair.email}`;
+                    else participants += `,${pair.mentee_email || pair.email},${pair.mentor_email}`;
+                }
+            }
 
-    const res = await fetch('/api/sessions/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
-        body: JSON.stringify({ pair_id: window.SELECTED_PAIR_ID, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
-    });
-    if (res.ok) { window.closeScheduleModal(); initDashboard(); }
-};
-window.setSessionFilter = function (f) {
-    window.CURRENT_SESSION_FILTER = f;
-    const btns = document.querySelectorAll('.session-tabs-wrap .pairing-pill');
-    btns.forEach(btn => {
-        if (btn.innerText.toLowerCase().includes(f.toLowerCase())) btn.classList.add('active');
-        else btn.classList.remove('active');
-    });
-    // AUTHORITATIVE FIX: Only re-render the list, DO NOT initDashboard (to avoid redirect)
-    window.renderSessions(window.DASH_DATA?.sessions || []);
-};
+            const res = await fetch('/api/sessions/schedule', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
+                body: JSON.stringify({ pair_id: window.SELECTED_PAIR_ID, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
+            });
+            if (res.ok) { window.closeScheduleModal(); initDashboard(); }
+        };
+        window.setSessionFilter = function (f) {
+            window.CURRENT_SESSION_FILTER = f;
+            const btns = document.querySelectorAll('.session-tabs-wrap .pairing-pill');
+            btns.forEach(btn => {
+                if (btn.innerText.toLowerCase().includes(f.toLowerCase())) btn.classList.add('active');
+                else btn.classList.remove('active');
+            });
+            // AUTHORITATIVE FIX: Only re-render the list, DO NOT initDashboard (to avoid redirect)
+            window.renderSessions(window.DASH_DATA?.sessions || []);
+        };
 
-window.renderSessions = function (sessions) {
-    const list = document.getElementById('sessions-list-container');
-    if (!list) return;
-    const user = StarsSession.get()?.user;
-    const isMentee = user?.role === 'Mentee';
-    const filter = window.CURRENT_SESSION_FILTER || 'Upcoming';
+        window.renderSessions = function (sessions) {
+            const list = document.getElementById('sessions-list-container');
+            if (!list) return;
+            const user = StarsSession.get()?.user;
+            const isMentee = user?.role === 'Mentee';
+            const filter = window.CURRENT_SESSION_FILTER || 'Upcoming';
 
-    const now = new Date().getTime();
-    const filtered = sessions.filter(s => {
-        const sTime = new Date(s.start_time).getTime();
-        if (filter === 'Past') return sTime < now;
-        if (filter === 'Upcoming') return sTime >= now;
-        return true;
-    });
+            const now = new Date().getTime();
+            const filtered = sessions.filter(s => {
+                const sTime = new Date(s.start_time).getTime();
+                if (filter === 'Past') return sTime < now;
+                if (filter === 'Upcoming') return sTime >= now;
+                return true;
+            });
 
-    list.innerHTML = filtered.map(s => {
-        const isScheduler = s.scheduled_by === user.email;
-        const isCounselor = !!user.isCounselor || !!user.is_counselor;
-        const isMentorForStaffSession = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor') && user.role === 'Mentor';
+            list.innerHTML = filtered.map(s => {
+                const isScheduler = s.scheduled_by === user.email;
+                const isCounselor = !!user.isCounselor || !!user.is_counselor;
+                const isMentorForStaffSession = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor') && user.role === 'Mentor';
 
-        // Final Parity Visibility for Trash Icon
-        const canTrash = isScheduler || isCounselor || isMentorForStaffSession;
+                // Final Parity Visibility for Trash Icon
+                const canTrash = isScheduler || isCounselor || isMentorForStaffSession;
 
-        // JOIN LOCK LOGIC (Mentees only)
-        // Link remains inactive until they click the Pre-Session survey link
-        const isJoinLocked = isMentee && !(window.SURVEY_CLICKS && window.SURVEY_CLICKS[s.id]);
-        const joinBtnStyle = isJoinLocked ? 'opacity:0.5; pointer-events:none; filter:grayscale(1);' : '';
-        const lockNote = isJoinLocked ? `<div style="font-size:0.65rem; color:#ef4444; font-weight:800; margin-top:0.3rem;">LOCKED: Complete Pre-Survey first</div>` : '';
+                // JOIN LOCK LOGIC (Mentees only)
+                // Link remains inactive until they click the Pre-Session survey link
+                const isJoinLocked = isMentee && !(window.SURVEY_CLICKS && window.SURVEY_CLICKS[s.id]);
+                const joinBtnStyle = isJoinLocked ? 'opacity:0.5; pointer-events:none; filter:grayscale(1);' : '';
+                const lockNote = isJoinLocked ? `<div style="font-size:0.65rem; color:#ef4444; font-weight:800; margin-top:0.3rem;">LOCKED: Complete Pre-Survey first</div>` : '';
 
-        // MENTEE PRE-SURVEY LINK (Required for unlock)
-        const PRE_SURVEY_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
-        const preSurveyBtn = isMentee && isJoinLocked
-            ? `<a href="${PRE_SURVEY_URL}" target="_blank" onclick="window.unlockSessionJoin('${s.id}')" class="btn-white" style="text-decoration:none; padding:0.6rem 1rem; border-radius:12px; font-size:0.75rem; border:1px solid #fce4ec; color:#e84393; font-weight:800;">1. Open Pre-Survey</a>`
-            : '';
+                // MENTEE PRE-SURVEY LINK (Required for unlock)
+                const PRE_SURVEY_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
+                const preSurveyBtn = isMentee && isJoinLocked
+                    ? `<a href="${PRE_SURVEY_URL}" target="_blank" onclick="window.unlockSessionJoin('${s.id}')" class="btn-white" style="text-decoration:none; padding:0.6rem 1rem; border-radius:12px; font-size:0.75rem; border:1px solid #fce4ec; color:#e84393; font-weight:800;">1. Open Pre-Survey</a>`
+                    : '';
 
-        const attribution = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor')
-            ? `<div style="font-size: 0.7rem; color: #e84393; font-weight: 800; text-transform: uppercase; margin-top: 0.2rem;">Scheduled by Counselor ${s.scheduler_name || 'Staff'}</div>`
-            : '';
+                const attribution = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor')
+                    ? `<div style="font-size: 0.7rem; color: #e84393; font-weight: 800; text-transform: uppercase; margin-top: 0.2rem;">Scheduled by Counselor ${s.scheduler_name || 'Staff'}</div>`
+                    : '';
 
-        // Meeting Link Visualization
-        let linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" 
+                // Meeting Link Visualization
+                let linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" 
                                style="text-decoration:none; padding:0.6rem 1.2rem; border-radius:12px; ${joinBtnStyle}">Join Call</a>`;
 
-        if (!isJoinLocked && s.meeting_link) {
-            linkActionHtml = `
+                if (!isJoinLocked && s.meeting_link) {
+                    linkActionHtml = `
                 <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
                     <a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="text-decoration:none; padding:0.8rem 1.5rem; border-radius:12px; font-weight:800; width:100%; text-align:center;">ENTER MEETING LINK</a>
                     <div style="font-size:0.65rem; color:#22c55e; font-weight:800;">✓ ACCESS UNLOCKED</div>
                 </div>
             `;
-        }
+                }
 
-        return `<div style="background:white; border-radius:20px; padding:1.5rem; border:1.5px solid #fce4ec; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
+                return `<div style="background:white; border-radius:20px; padding:1.5rem; border:1.5px solid #fce4ec; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
             <div style="flex: 1;">
                 <div style="font-weight:800; color:#e84393;">${new Date(s.start_time).toLocaleString()}</div>
                 <div style="font-size:0.8rem; color:#64748b; font-weight: 600;">${s.partner_name || 'Partner'}</div>
@@ -1151,33 +1153,33 @@ window.renderSessions = function (sessions) {
                 ${linkActionHtml}
             </div>
         </div>`;
-    }).join('') || `<div style="text-align:center; padding:3rem; color:#94a3b8;">No ${filter} sessions found.</div>`;
-};
+            }).join('') || `<div style="text-align:center; padding:3rem; color:#94a3b8;">No ${filter} sessions found.</div>`;
+        };
 
-window.SURVEY_CLICKS = {};
-window.unlockSessionJoin = function (sessionId) {
-    window.SURVEY_CLICKS[sessionId] = true;
-    window.renderSessions(window.DASH_DATA.sessions); // Re-render to unlock
-};
+        window.SURVEY_CLICKS = {};
+        window.unlockSessionJoin = function (sessionId) {
+            window.SURVEY_CLICKS[sessionId] = true;
+            window.renderSessions(window.DASH_DATA.sessions); // Re-render to unlock
+        };
 
-window.renderStaffSessionsSelector = function () {
-    const target = document.getElementById('counselor-session-controls');
-    if (!target) return;
-    const user = StarsSession.get()?.user;
-    if (!user || (user.role !== 'ProgramStaff' && !user.isCounselor && !user.is_counselor)) return;
+        window.renderStaffSessionsSelector = function () {
+            const target = document.getElementById('counselor-session-controls');
+            if (!target) return;
+            const user = StarsSession.get()?.user;
+            if (!user || (user.role !== 'ProgramStaff' && !user.isCounselor && !user.is_counselor)) return;
 
-    const pairs = window.DASH_DATA?.pairs || [];
+            const pairs = window.DASH_DATA?.pairs || [];
 
-    // Grouping by Mentor (Screenshot Parity)
-    const grouped = {};
-    pairs.forEach(p => {
-        const mName = p.mentor_name || 'Unassigned Mentor';
-        if (!grouped[mName]) grouped[mName] = [];
-        grouped[mName].push(p);
-    });
+            // Grouping by Mentor (Screenshot Parity)
+            const grouped = {};
+            pairs.forEach(p => {
+                const mName = p.mentor_name || 'Unassigned Mentor';
+                if (!grouped[mName]) grouped[mName] = [];
+                grouped[mName].push(p);
+            });
 
-    target.innerHTML = `<div class="section-title" style="margin-top: 3rem;">SCHEDULE A SESSION</div>` +
-        Object.keys(grouped).map(mentor => `
+            target.innerHTML = `<div class="section-title" style="margin-top: 3rem;">SCHEDULE A SESSION</div>` +
+                Object.keys(grouped).map(mentor => `
         <div class="pair-label" style="color: #64748b; font-size: 0.75rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase;">MENTOR: ${mentor}</div>
         ${grouped[mentor].map(p => `
             <div class="mentee-card-yellow" onclick="window.openScheduleModal('${p.mentee_name}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
@@ -1192,15 +1194,15 @@ window.renderStaffSessionsSelector = function () {
             </div>
         `).join('')}
     `).join('');
-};
-window.renderMentors = (mentors, targetId) => {
-    const tid = targetId || 'mentors-grid';
-    const g = document.getElementById(tid);
-    if (!g) return;
+        };
+        window.renderMentors = (mentors, targetId) => {
+            const tid = targetId || 'mentors-grid';
+            const g = document.getElementById(tid);
+            if (!g) return;
 
-    g.innerHTML = `<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; width: 100%;">` +
-        // Mentors: Horizontal layout with pink bubble avatar and status text
-        mentors.map(m => `
+            g.innerHTML = `<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem; width: 100%;">` +
+                // Mentors: Horizontal layout with pink bubble avatar and status text
+                mentors.map(m => `
         <div class="mentor-horizontal-card" onclick="window.viewMentorProfile('${m.email}')" 
              style="background: white; border: 1.5px solid #f1f5f9; border-radius: 20px; padding: 1.25rem 1.5rem; display: flex; align-items: center; justify-content: space-between; cursor: pointer; transition: 0.2s;">
             <div style="display: flex; align-items: center; gap: 1.25rem;">
@@ -1214,159 +1216,159 @@ window.renderMentors = (mentors, targetId) => {
             <div style="color: #16a34a; font-weight: 800; font-size: 0.8rem; letter-spacing: 0.3px;">Available</div>
         </div>
     `).join('') + `</div>`;
-};
+        };
 
-window.filterMentors = () => {
-    const q = document.getElementById('mentor-search-input')?.value.toLowerCase();
-    const mentors = window.DASH_DATA?.mentors || [];
-    const filtered = mentors.filter(m => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
-    window.renderMentors(filtered, 'mentors-search-grid');
-};
-window.viewMentorProfile = (e) => {
-    const m = (window.DASH_DATA?.mentors || []).find(x => x.email === e);
-    if (!m) return;
-    document.getElementById('modal-mentor-name').textContent = m.name;
-    document.getElementById('modal-mentor-avatar').textContent = m.name.charAt(0);
-    document.getElementById('modal-mentor-bio').textContent = m.bio || 'STARS Mentor';
+        window.filterMentors = () => {
+            const q = document.getElementById('mentor-search-input')?.value.toLowerCase();
+            const mentors = window.DASH_DATA?.mentors || [];
+            const filtered = mentors.filter(m => m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
+            window.renderMentors(filtered, 'mentors-search-grid');
+        };
+        window.viewMentorProfile = (e) => {
+            const m = (window.DASH_DATA?.mentors || []).find(x => x.email === e);
+            if (!m) return;
+            document.getElementById('modal-mentor-name').textContent = m.name;
+            document.getElementById('modal-mentor-avatar').textContent = m.name.charAt(0);
+            document.getElementById('modal-mentor-bio').textContent = m.bio || 'STARS Mentor';
 
-    // Screenshot 2 Parity: Interests population
-    const intCont = document.getElementById('modal-mentor-interests');
-    if (intCont) {
-        const ints = m.interests ? m.interests.split(',') : [];
-        intCont.innerHTML = ints.map(i => `<span style="background:#fff1f6; color:#e84393; padding:0.4rem 0.8rem; border-radius:10px; font-size:0.75rem; font-weight:800; border:1px solid #fce4ec;">${i.trim()}</span>`).join('') || '<span style="color:#94a3b8; font-size:0.8rem;">General Interests</span>';
-    }
+            // Screenshot 2 Parity: Interests population
+            const intCont = document.getElementById('modal-mentor-interests');
+            if (intCont) {
+                const ints = m.interests ? m.interests.split(',') : [];
+                intCont.innerHTML = ints.map(i => `<span style="background:#fff1f6; color:#e84393; padding:0.4rem 0.8rem; border-radius:10px; font-size:0.75rem; font-weight:800; border:1px solid #fce4ec;">${i.trim()}</span>`).join('') || '<span style="color:#94a3b8; font-size:0.8rem;">General Interests</span>';
+            }
 
-    document.getElementById('mentor-profile-modal').style.display = 'flex';
-};
-window.renderResources = (r) => {
-    const g = document.getElementById('resource-list-grid');
-    if (!g) return;
-    const user = StarsSession.get()?.user;
+            document.getElementById('mentor-profile-modal').style.display = 'flex';
+        };
+        window.renderResources = (r) => {
+            const g = document.getElementById('resource-list-grid');
+            if (!g) return;
+            const user = StarsSession.get()?.user;
 
-    // Hide upload for Mentees and Visitors (Restricted access)
-    const uploadBtn = document.getElementById('btn-upload-resource');
-    if (uploadBtn) uploadBtn.style.display = (user?.role === 'Mentee' || user?.role === 'Visitor' ? 'none' : 'flex');
+            // Hide upload for Mentees and Visitors (Restricted access)
+            const uploadBtn = document.getElementById('btn-upload-resource');
+            if (uploadBtn) uploadBtn.style.display = (user?.role === 'Mentee' || user?.role === 'Visitor' ? 'none' : 'flex');
 
-    g.innerHTML = r.map(x => `<div class="resource-card" style="background:white; border-radius:20px; padding:1.5rem; border:1px solid #f1f5f9;">
+            g.innerHTML = r.map(x => `<div class="resource-card" style="background:white; border-radius:20px; padding:1.5rem; border:1px solid #f1f5f9;">
         <div style="font-weight:800; color:#e84393; margin-bottom:0.5rem;">${x.name}</div><p style="font-size:0.8rem;">${x.description}</p>
         <div style="display:flex; gap:0.5rem; margin-top:1rem;">
             <button onclick="window.openResourcePreview('${x.url}', '${x.name}')" class="btn-magenta" style="flex:1; padding:0.6rem; border-radius:10px; font-weight:800; border:none; cursor:pointer;">Preview</button>
             <a href="${x.url}" target="_blank" class="btn-white" style="flex:1; text-align:center; text-decoration:none; padding:0.6rem; border-radius:10px; font-weight:800; border:1px solid #fce4ec; color:#e84393;">Open Link</a>
         </div>
     </div>`).join('');
-};
+        };
 
-window.openResourcePreview = (url, name) => {
-    const modal = document.getElementById('resource-preview-modal');
-    const iframe = document.getElementById('resource-preview-iframe');
-    const title = document.getElementById('preview-filename');
-    if (modal && iframe) {
-        title.textContent = name || "Resource Preview";
-        iframe.src = url;
-        modal.style.display = 'flex';
-    }
-};
-window.closeResourcePreview = () => {
-    const modal = document.getElementById('resource-preview-modal');
-    const iframe = document.getElementById('resource-preview-iframe');
-    if (modal && iframe) {
-        modal.style.display = 'none';
-        iframe.src = '';
-    }
-};
-
-// 8. RESOURCE MANAGEMENT (Functional Logic)
-window.openResourceUpload = () => {
-    const modal = document.getElementById('resource-upload-modal-overlay');
-    if (modal) modal.style.display = 'flex';
-};
-
-window.closeResourceUpload = () => {
-    const modal = document.getElementById('resource-upload-modal-overlay');
-    if (modal) modal.style.display = 'none';
-};
-
-window.submitResource = async () => {
-    const name = document.getElementById('res-upload-name')?.value;
-    const url = document.getElementById('res-upload-url')?.value;
-    const description = document.getElementById('res-upload-desc')?.value;
-
-    if (!name || !url) {
-        alert("Name and URL are required.");
-        return;
-    }
-
-    try {
-        const res = await fetch('/api/resources/upload', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${StarsSession.get().token}`
-            },
-            body: JSON.stringify({ name, url, description, category: 'General' })
-        });
-
-        if (res.ok) {
-            window.closeResourceUpload();
-            if (window.initDashboard) window.initDashboard(); // Refresh
-        } else {
-            alert("Upload failed. Please try again.");
-        }
-    } catch (e) {
-        console.error("Resource upload error:", e);
-        alert("A connectivity error occurred.");
-    }
-};
-
-
-
-window.SURVEY_ALERTS_SHOWN = {};
-window.checkSessionTimers = function () {
-    const sessions = window.DASH_DATA?.sessions || [];
-    const user = StarsSession.get()?.user;
-    if (!sessions.length || !user) return;
-
-    const now = new Date();
-    const MENTEE_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u";
-    const MENTOR_DURING_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
-    const MENTOR_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u"; // Placeholder mentor post
-
-    sessions.forEach(s => {
-        const sTime = new Date(s.start_time);
-        const diffMs = now - sTime;
-        const diffMins = Math.floor(diffMs / 60000);
-
-        // 1. Mentor During-Session (As soon as it starts)
-        if (user.role === 'Mentor' && diffMins >= 0 && diffMins < 45) {
-            if (!window.SURVEY_ALERTS_SHOWN[`during_${s.id}`]) {
-                window.SURVEY_ALERTS_SHOWN[`during_${s.id}`] = true;
-                window.triggerSurveyAlert("Session Started", "Please complete your 'During-Session' mentor survey now.", MENTOR_DURING_LINK);
+        window.openResourcePreview = (url, name) => {
+            const modal = document.getElementById('resource-preview-modal');
+            const iframe = document.getElementById('resource-preview-iframe');
+            const title = document.getElementById('preview-filename');
+            if (modal && iframe) {
+                title.textContent = name || "Resource Preview";
+                iframe.src = url;
+                modal.style.display = 'flex';
             }
-        }
-
-        // 2. Mentee Post-Session (5 mins before it ends - session is 45 mins)
-        if (user.role === 'Mentee' && diffMins >= 40 && diffMins < 45) {
-            if (!window.SURVEY_ALERTS_SHOWN[`post_5min_${s.id}`]) {
-                window.SURVEY_ALERTS_SHOWN[`post_5min_${s.id}`] = true;
-                window.triggerSurveyAlert("Session Ending Soon", "Please complete your post-session mentee survey.", MENTEE_POST_LINK);
+        };
+        window.closeResourcePreview = () => {
+            const modal = document.getElementById('resource-preview-modal');
+            const iframe = document.getElementById('resource-preview-iframe');
+            if (modal && iframe) {
+                modal.style.display = 'none';
+                iframe.src = '';
             }
-        }
+        };
 
-        // 3. Mentor Post-Session (As soon as it ends)
-        if (user.role === 'Mentor' && diffMins >= 45 && diffMins < 50) {
-            if (!window.SURVEY_ALERTS_SHOWN[`post_${s.id}`]) {
-                window.SURVEY_ALERTS_SHOWN[`post_${s.id}`] = true;
-                window.triggerSurveyAlert("Session Finished", "Please complete your final post-session evaluation.", MENTOR_POST_LINK);
+        // 8. RESOURCE MANAGEMENT (Functional Logic)
+        window.openResourceUpload = () => {
+            const modal = document.getElementById('resource-upload-modal-overlay');
+            if (modal) modal.style.display = 'flex';
+        };
+
+        window.closeResourceUpload = () => {
+            const modal = document.getElementById('resource-upload-modal-overlay');
+            if (modal) modal.style.display = 'none';
+        };
+
+        window.submitResource = async () => {
+            const name = document.getElementById('res-upload-name')?.value;
+            const url = document.getElementById('res-upload-url')?.value;
+            const description = document.getElementById('res-upload-desc')?.value;
+
+            if (!name || !url) {
+                alert("Name and URL are required.");
+                return;
             }
-        }
-    });
-};
 
-window.triggerSurveyAlert = function (title, msg, link) {
-    // Inject a centered, stars-themed alert box
-    const modal = document.createElement('div');
-    modal.style = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);";
-    modal.innerHTML = `
+            try {
+                const res = await fetch('/api/resources/upload', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${StarsSession.get().token}`
+                    },
+                    body: JSON.stringify({ name, url, description, category: 'General' })
+                });
+
+                if (res.ok) {
+                    window.closeResourceUpload();
+                    if (window.initDashboard) window.initDashboard(); // Refresh
+                } else {
+                    alert("Upload failed. Please try again.");
+                }
+            } catch (e) {
+                console.error("Resource upload error:", e);
+                alert("A connectivity error occurred.");
+            }
+        };
+
+
+
+        window.SURVEY_ALERTS_SHOWN = {};
+        window.checkSessionTimers = function () {
+            const sessions = window.DASH_DATA?.sessions || [];
+            const user = StarsSession.get()?.user;
+            if (!sessions.length || !user) return;
+
+            const now = new Date();
+            const MENTEE_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u";
+            const MENTOR_DURING_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
+            const MENTOR_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u"; // Placeholder mentor post
+
+            sessions.forEach(s => {
+                const sTime = new Date(s.start_time);
+                const diffMs = now - sTime;
+                const diffMins = Math.floor(diffMs / 60000);
+
+                // 1. Mentor During-Session (As soon as it starts)
+                if (user.role === 'Mentor' && diffMins >= 0 && diffMins < 45) {
+                    if (!window.SURVEY_ALERTS_SHOWN[`during_${s.id}`]) {
+                        window.SURVEY_ALERTS_SHOWN[`during_${s.id}`] = true;
+                        window.triggerSurveyAlert("Session Started", "Please complete your 'During-Session' mentor survey now.", MENTOR_DURING_LINK);
+                    }
+                }
+
+                // 2. Mentee Post-Session (5 mins before it ends - session is 45 mins)
+                if (user.role === 'Mentee' && diffMins >= 40 && diffMins < 45) {
+                    if (!window.SURVEY_ALERTS_SHOWN[`post_5min_${s.id}`]) {
+                        window.SURVEY_ALERTS_SHOWN[`post_5min_${s.id}`] = true;
+                        window.triggerSurveyAlert("Session Ending Soon", "Please complete your post-session mentee survey.", MENTEE_POST_LINK);
+                    }
+                }
+
+                // 3. Mentor Post-Session (As soon as it ends)
+                if (user.role === 'Mentor' && diffMins >= 45 && diffMins < 50) {
+                    if (!window.SURVEY_ALERTS_SHOWN[`post_${s.id}`]) {
+                        window.SURVEY_ALERTS_SHOWN[`post_${s.id}`] = true;
+                        window.triggerSurveyAlert("Session Finished", "Please complete your final post-session evaluation.", MENTOR_POST_LINK);
+                    }
+                }
+            });
+        };
+
+        window.triggerSurveyAlert = function (title, msg, link) {
+            // Inject a centered, stars-themed alert box
+            const modal = document.createElement('div');
+            modal.style = "position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.6); z-index:99999; display:flex; align-items:center; justify-content:center; backdrop-filter:blur(5px);";
+            modal.innerHTML = `
         <div style="background:white; padding:2.5rem; border-radius:24px; text-align:center; width:450px; box-shadow:0 25px 50px rgba(0,0,0,0.25); border:3px solid #fce4ec;">
             <div style="width:70px; height:70px; background:#fff1f6; color:#e84393; border-radius:20px; display:flex; align-items:center; justify-content:center; margin:0 auto 1.5rem auto;">
                 <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
@@ -1379,6 +1381,6 @@ window.triggerSurveyAlert = function (title, msg, link) {
             </div>
         </div>
     `;
-    modal.className = 'parent';
-    document.body.appendChild(modal);
-};
+            modal.className = 'parent';
+            document.body.appendChild(modal);
+        };
