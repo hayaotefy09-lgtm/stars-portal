@@ -1,0 +1,82 @@
+[
+    {
+        "email": "Nabeera.n@naischool.ae",
+        "first_name": "Nabeera",
+        "last_name": "Noman",
+        "password": "pass",
+        "role": "ProgramStaff",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "joshua.q@naischool.ae",
+        "first_name": "Joshua",
+        "last_name": "Quinn",
+        "password": "pass",
+        "role": "ProgramStaff",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "dummy.counselor@naischool.ae",
+        "first_name": "Dummy",
+        "last_name": "Counselor",
+        "password": "pass",
+        "role": "ProgramStaff",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "hayaotefy09@gmail.com",
+        "first_name": "Master",
+        "last_name": "Admin",
+        "password": "pass",
+        "role": "ProgramStaff",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "mentor@naischool.ae",
+        "first_name": "Test",
+        "last_name": "Mentor",
+        "password": "pass",
+        "role": "Mentor",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "mentee1@naischool.ae",
+        "first_name": "Amira",
+        "last_name": "Ali Ismael",
+        "password": "pass",
+        "role": "Mentee",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "mentee2@naischool.ae",
+        "first_name": "Raqia",
+        "last_name": "Ahmed",
+        "password": "pass",
+        "role": "Mentee",
+        "title": null,
+        "bio": null,
+        "interests": null
+    },
+    {
+        "email": "dummy.mentee@naischool.ae",
+        "first_name": "Tester",
+        "last_name": "Mentee",
+        "password": "pass",
+        "role": "Mentee",
+        "title": null,
+        "bio": null,
+        "interests": null
+    }
+]

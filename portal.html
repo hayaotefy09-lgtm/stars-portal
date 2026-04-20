@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STARS Portal | Welcome</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css?v_premium_restoration">
+    <style>
+        body {
+            background: linear-gradient(135deg, #fff1f6 0%, #fff9fb 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 2rem;
+            margin: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+        .portal-wrapper {
+            max-width: 900px;
+            width: 100%;
+            animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .portal-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+        .portal-logo {
+            width: 100px;
+            height: 100px;
+            margin-bottom: 1.5rem;
+            filter: drop-shadow(0 10px 20px rgba(232, 67, 147, 0.15));
+        }
+        .portal-title {
+            font-size: 4rem;
+            font-weight: 800;
+            color: var(--stars-magenta);
+            letter-spacing: -2px;
+            line-height: 1;
+            margin: 0 0 0.5rem 0;
+        }
+        .portal-subtitle {
+            font-weight: 600;
+            color: var(--text-slate);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.9rem;
+            margin: 0;
+        }
+        
+        .portal-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+        
+        .entry-card {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 32px;
+            border: 2px solid var(--stars-pink-border);
+            text-align: left;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 1.75rem;
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+        }
+        
+        .entry-card:hover {
+            border-color: var(--stars-magenta);
+            transform: translateY(-8px);
+            box-shadow: 0 25px 60px rgba(232, 67, 147, 0.12);
+        }
+        
+        .entry-card::after {
+            content: "→";
+            position: absolute;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%) translateX(20px);
+            font-size: 1.5rem;
+            color: var(--stars-magenta);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+        
+        .entry-card:hover::after {
+            opacity: 1;
+            transform: translateY(-50%) translateX(0);
+        }
+        
+        .entry-icon {
+            width: 70px;
+            height: 70px;
+            background: var(--stars-bg);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--stars-magenta);
+            flex-shrink: 0;
+            transition: all 0.3s;
+        }
+        
+        .entry-card:hover .entry-icon {
+            background: var(--stars-magenta);
+            color: white;
+            transform: scale(1.1) rotate(-5deg);
+        }
+        
+        .entry-text b {
+            display: block;
+            font-size: 1.4rem;
+            color: var(--text-dark);
+            margin-bottom: 0.25rem;
+            font-weight: 800;
+        }
+        
+        .entry-text span {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .visitor-option {
+            grid-column: span 2;
+            justify-content: center;
+            background: rgba(255, 255, 255, 0.4);
+            border-style: dashed;
+            margin-top: 1rem;
+            backdrop-filter: blur(4px);
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @media (max-width: 768px) {
+            .portal-grid { grid-template-columns: 1fr; }
+            .visitor-option { grid-column: span 1; }
+            .portal-title { font-size: 3rem; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="portal-wrapper">
+        <header class="portal-header">
+            <img src="assets/logo.png" alt="STARS Logo" class="portal-logo">
+            <h1 class="portal-title">STARS</h1>
+            <p class="portal-subtitle">Sisterhood • Tenacity • Awareness • Resilience • Self-love</p>
+        </header>
+
+        <div class="portal-grid">
+            <a href="/index.html#register" class="entry-card">
+                <div class="entry-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                </div>
+                <div class="entry-text">
+                    <b>Student Registration</b>
+                    <span>Join the sisterhood today</span>
+                </div>
+            </a>
+
+            <a href="/index.html#login" class="entry-card">
+                <div class="entry-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                </div>
+                <div class="entry-text">
+                    <b>Student Login</b>
+                    <span>Access your dashboard</span>
+                </div>
+            </a>
+
+            <a href="/index.html#staff-verify" class="entry-card">
+                <div class="entry-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                </div>
+                <div class="entry-text">
+                    <b>Program Staff</b>
+                    <span>Counselor & Admin gateway</span>
+                </div>
+            </a>
+
+            <a href="/index.html#visitor" class="entry-card visitor-option">
+                <div class="entry-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </div>
+                <div class="entry-text">
+                    <b>Explore as Visitor</b>
+                    <span>Guest access for external observers</span>
+                </div>
+            </a>
+        </div>
+    </div>
+
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "stars-mentorship-portal",
+  "version": "4.0.0",
+  "description": "STARS Mentorship Portal - Cloud Migrated Version (Supabase)",
+  "main": "server.py",
+  "scripts": {
+    "test": "bash verify_supabase.sh",
+    "dev": "python3 server.py"
+  },
+  "author": "STARS Team",
+  "license": "ISC"
+}

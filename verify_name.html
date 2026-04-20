@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STARS - Name Verification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --magenta: #e84393;
+            --magenta-hover: #d81b60;
+            --pink-light: #fce7f3;
+            --pink-border: #fbcfe8;
+            --text-dark: #2d3436;
+            --text-muted: #6b7280;
+            --bg-main: #fdf2f8;
+            --font-heading: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        body { font-family: var(--font-body); background: var(--bg-main); display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; }
+        .card { background: white; padding: 3rem; border-radius: 24px; box-shadow: 0 10px 40px rgba(232, 67, 147, 0.1); width: 100%; max-width: 450px; text-align: center; border: 1px solid var(--pink-border); }
+        h2 { color: var(--magenta); font-family: var(--font-heading); margin-bottom: 1.5rem; font-weight: 800; }
+        p { color: var(--text-muted); margin-bottom: 2rem; font-size: 0.95rem; }
+        input { width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 12px; margin-bottom: 1rem; border: 1px solid var(--pink-border); outline: none; transition: 0.2s; }
+        input:focus { border-color: var(--magenta); box-shadow: 0 0 0 3px rgba(232, 67, 147, 0.1); }
+        .btn { display: block; width: 100%; padding: 1rem; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; border: none; background: var(--magenta); color: white; transition: 0.2s; }
+        .btn:hover { background: var(--magenta-hover); transform: translateY(-2px); }
+        .result { margin-top: 1.5rem; padding: 1rem; border-radius: 12px; display: none; }
+        .success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .error { background: #fef2f2; color: #ef4444; border: 1px solid #fecaca; }
+        .back-link { display: inline-block; margin-top: 1.5rem; color: var(--magenta); text-decoration: none; font-size: 0.9rem; font-weight: 600; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <img src="assets/logo.png" alt="STARS" style="width: 80px; margin-bottom: 1rem; border-radius: 12px;">
+        <h2>Verify Your Name</h2>
+        <p>Enter your details to check if your account is pre-approved in the STARS system.</p>
+        
+        <input type="text" id="v-fname" placeholder="First Name" required>
+        <input type="text" id="v-lname" placeholder="Last Name" required>
+        <input type="email" id="v-email" placeholder="School Email (@naischool.ae)" required>
+        
+        <button class="btn" onclick="verifyName()">Verify My Name Now</button>
+        
+        <div id="v-result" class="result"></div>
+        
+        <a href="/" class="back-link">← Return to Login Page</a>
+    </div>
+
+    <script>
+        async function verifyName() {
+            const fname = document.getElementById('v-fname').value;
+            const lname = document.getElementById('v-lname').value;
+            const email = document.getElementById('v-email').value;
+            const resultDiv = document.getElementById('v-result');
+            
+            if(!fname || !lname || !email) {
+                showResult("Please fill in all fields.", "error");
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/verify_name', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ firstName: fname, lastName: lname, email: email })
+                });
+                
+                const data = await res.json();
+                
+                if (data.success) {
+                    showResult(`Verified! You are registered as a <strong>${data.role}</strong>. You can now go back and create your account.`, "success");
+                } else {
+                    showResult(data.error || "Name not found. Please contact a counselor.", "error");
+                }
+            } catch (e) {
+                showResult("Connection error. Is the server running?", "error");
+            }
+        }
+
+        function showResult(text, type) {
+            const resultDiv = document.getElementById('v-result');
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'result ' + type;
+            resultDiv.innerHTML = text;
+        }
+    </script>
+</body>
+</html>

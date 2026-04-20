@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="style.css?v=7.4">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="stars_core_v32.js?v=7.4"></script>
+    <style>
+        /* Unified Confirmation Modal (CSS Pattern parity with admin) */
+        .stars-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 1rem;
+        }
+
+        .stars-modal {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 28px;
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25);
+            border: 2px solid #fce4ec;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .stars-modal.active {
+            transform: scale(1);
+            opacity: 1;
+        }
+
+        .stars-modal h3 {
+            font-family: 'Outfit', sans-serif;
+            color: #1e293b;
+            font-size: 1.5rem;
+            margin-bottom: 0.75rem;
+            font-weight: 800;
+        }
+
+        .stars-modal p {
+            color: #64748b;
+            line-height: 1.6;
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        .modal-action-row {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .modal-action-row button {
+            flex: 1;
+            padding: 1.1rem;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            border: none;
+            transition: 0.2s;
+        }
+
+        .modal-cancel {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .modal-confirm {
+            background: #e84393;
+            color: white;
+            box-shadow: 0 4px 12px rgba(232, 67, 147, 0.2);
+        }
+
+        .modal-cancel:hover {
+            background: #e2e8f0;
+        }
+
+        .modal-confirm:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(232, 67, 147, 0.3);
+        }
+
+        .pairing-pill {
+            padding: 0.8rem 1.5rem;
+            background: white;
+            border: 2.5px solid #fce4ec;
+            border-radius: 14px;
+            color: #e84393;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: 0.2s;
+            font-family: 'Outfit', sans-serif;
+            display: inline-block;
+            margin: 0.25rem;
+        }
+
+        .pairing-pill.active {
+            background: #e84393;
+            color: white;
+            border-color: #e84393;
+            box-shadow: 0 4px 12px rgba(232, 67, 147, 0.2);
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+
+
+<body style="background-color: var(--stars-bg);">
+    <div id="system-loader">
+        <div class="spinner"></div>
+        <div style="color: var(--stars-magenta); font-weight: 700; font-size: 1.2rem;">Initializing STARS...</div>
+    </div>
+
+
+
+    <!-- STAR-MODAL SYSTEM: Identity Parity -->
+    <div id="stars-modal-overlay" class="stars-modal-overlay">
+        <div id="stars-modal" class="stars-modal">
+            <h3 id="stars-modal-title">Confirm Action</h3>
+            <p id="stars-modal-body">Proceed with this action?</p>
+            <div class="modal-action-row">
+                <button type="button" class="modal-cancel" onclick="window.closeStarsModal()">Cancel</button>
+                <button type="button" class="modal-confirm" id="stars-modal-confirm-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="system-error">
+        <h3 style="color: #991b1b; margin-bottom: 0.5rem;">System Connection Gateway</h3>
+        <p id="error-text" style="color: #b91c1c; font-size: 0.9rem;">Unable to connect to the cloud registry. This
+            happens during first-time setup or maintenance.</p>
+        <button onclick="location.reload()" class="btn-magenta" style="margin-top: 1.5rem; width: 100%;">Retry
+            Connection</button>
+    </div>
+
+    <div id="auth-gateway" class="auth-gateway-wrap">
+        <div class="logo-box-outer" style="margin-bottom: 2rem;">
+            <div
+                style="background: white; padding: 1.5rem; border-radius: 32px; box-shadow: 0 15px 40px rgba(232, 67, 147, 0.08); border: 2.5px solid var(--stars-white);">
+                <img src="assets/logo.png" alt="STARS Logo" style="width: 100px; height: 100px; border-radius: 8px;">
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-bottom: 3rem;">
+            <h1 class="portal-title" style="font-size: 3.5rem; margin: 0; font-weight: 800;">STARS</h1>
+            <p style="color: #64748b; font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem;">How would you like to
+                enter?</p>
+        </div>
+
+        <div class="auth-container">
+            <div id="auth-forms-container">
+                <!-- Gateway Selection Menu -->
+                <div id="auth-menu" class="auth-grid">
+                    <div class="auth-card student" id="login-btn-student-reg" onclick="showAuthForm('register')">
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <polygon
+                                    points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                                </polygon>
+                            </svg>
+                        </div>
+                        <div>
+                            <b>I'm a Student — Create Account</b>
+                            <span>Register with your school email</span>
+                        </div>
+                    </div>
+
+                    <div class="auth-card student" id="login-btn-student-log" onclick="showAuthForm('login')">
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="12" cy="7" r="4"></circle>
+                            </svg>
+                        </div>
+                        <div>
+                            <b>I'm a Student — Log In</b>
+                            <span>Use your name, school email and password</span>
+                        </div>
+                    </div>
+
+                    <div class="auth-card staff" id="login-btn-staff" onclick="showAuthForm('staff-verify')">
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <b>I am Program Staff</b>
+                            <span>Counselors, deans & program coordinators</span>
+                        </div>
+                    </div>
+
+                    <div class="separator-or">or</div>
+
+                    <div class="auth-card visitor" id="login-btn-visitor" onclick="showAuthForm('visitor')">
+                        <div class="icon-circle">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                <circle cx="12" cy="12" r="3"></circle>
+                            </svg>
+                        </div>
+                        <div>
+                            <b>I am a Visitor</b>
+                            <span>Enter your email to receive a one-time code</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Login Form -->
+                <form id="login-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="handleAuthSubmit(event, 'login'); return false;">
+                    <div class="auth-subtitle" style="margin-bottom: 2.5rem;">Access your STARS student profile</div>
+                    <label>School Email</label><input type="email" id="login-email" required
+                        placeholder="name@naischool.ae">
+                    <label>Password</label><input type="password" id="login-password" required>
+                    <div id="login-error" class="error-msg"></div>
+                    <button type="submit" id="login-submit-btn" class="btn-magenta" style="margin-top: 1rem;">Sign
+                        In</button>
+                    <a class="back-link" onclick="showAuthForm('menu')" style="margin-top: 1.5rem;">← Back to
+                        options</a>
+                </form>
+
+                <!-- Register Form -->
+                <form id="register-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="handleAuthSubmit(event, 'register')">
+                    <div class="auth-subtitle" style="margin-bottom: 2.5rem;">Create your STARS student profile</div>
+                    <label>I am a...</label>
+                    <select id="register-role" required
+                        style="width: 100%; padding: 1.1rem; border-radius: 12px; border: 1.5px solid #f1f5f9; font: inherit; background: white; margin-bottom: 0.5rem;">
+                        <option value="Mentor">Mentor</option>
+                        <option value="Mentee">Mentee</option>
+                    </select>
+                    <div style="display: flex; gap: 1.25rem; margin-bottom: 0.5rem;">
+                        <div style="flex: 1;"><label>First Name</label><input type="text" id="register-fname" required>
+                        </div>
+                        <div style="flex: 1;"><label>Last Name</label><input type="text" id="register-lname" required>
+                        </div>
+                    </div>
+                    <label>School Email</label><input type="email" id="register-email" required
+                        placeholder="name@naischool.ae">
+                    <label>Password</label><input type="password" id="register-password" required>
+                    <div id="register-error" class="error-msg"></div>
+                    <button type="submit" id="register-submit-btn" class="btn-magenta" style="margin-top: 1rem;">Create
+                        Account</button>
+                    <a class="back-link" onclick="showAuthForm('menu')" style="margin-top: 1.5rem;">← Back to
+                        options</a>
+                </form>
+
+                <!-- Staff Flow 1: Email Verification -->
+                <form id="staff-verify-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="window.handleStaffVerify(event); return false;">
+                    <div class="auth-subtitle" style="text-align: center; margin-bottom: 2rem;">Program Staff — enter
+                        your school email</div>
+                    <label>SCHOOL EMAIL</label>
+                    <input type="email" id="staff-verify-email" required placeholder="you@school.edu">
+                    <p style="font-size: 0.85rem; color: #94a3b8; margin: -0.5rem 0 1.5rem 0; text-align: left;">Your
+                        account is pre-created by your coordinator. Enter your school email to continue.</p>
+                    <div id="staff-verify-error" class="error-msg"></div>
+                    <button type="submit" id="staff-verify-submit-btn" class="btn-magenta">Continue</button>
+                    <a class="back-link" onclick="showAuthForm('menu')">← Back to options</a>
+                </form>
+
+                <!-- Staff Flow 2: Account Activation -->
+                <form id="staff-activate-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="window.handleStaffActivate(event); return false;">
+                    <div class="auth-subtitle" id="staff-activate-title"
+                        style="text-align: center; margin-bottom: 2rem;">Welcome! Create your password</div>
+                    <div id="staff-activate-badge" class="activation-badge">Account found</div>
+                    <label>CREATE PASSWORD</label>
+                    <input type="password" id="staff-activate-pass" required placeholder="Min 6 characters">
+                    <label>CONFIRM PASSWORD</label>
+                    <input type="password" id="staff-activate-confirm" required placeholder="Repeat password">
+                    <div id="staff-activate-error" class="error-msg"></div>
+                    <button type="submit" id="staff-activate-submit-btn" class="btn-magenta">Activate Account</button>
+                    <a class="back-link" onclick="showAuthForm('staff-verify')">← Back to email</a>
+                </form>
+
+                <!-- Staff Flow 3: Regular Login (Activated) -->
+                <form id="staff-login-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="handleAuthSubmit(event, 'staff'); return false;">
+                    <div class="auth-subtitle" id="staff-login-title">Welcome back!</div>
+                    <p style="text-align: center; color: #888; margin-top: -1rem; margin-bottom: 2rem;">Please enter
+                        your password to continue to the dashboard.</p>
+                    <input type="hidden" id="staff-email">
+                    <label>Password</label>
+                    <input type="password" id="staff-password" required placeholder="Enter your password">
+                    <div id="staff-error" class="error-msg"></div>
+                    <button type="submit" id="staff-login-submit-btn" class="btn-magenta">Sign In Securely</button>
+                    <a class="back-link" onclick="showAuthForm('staff-verify')">← Back to email</a>
+                </form>
+
+                <!-- Visitor Form -->
+                <form id="visitor-form" class="auth-form-v2" style="display: none;"
+                    onsubmit="handleAuthSubmit(event, 'visitor'); return false;">
+                    <p class="auth-subtitle">Request temporary access for guest sessions.</p>
+                    <div style="display: flex; gap: 0.75rem;">
+                        <div style="flex: 1;"><label>First Name</label><input type="text" id="visitor-fname" required>
+                        </div>
+                        <div style="flex: 1;"><label>Last Name</label><input type="text" id="visitor-lname" required>
+                        </div>
+                    </div>
+                    <label>Email (Personal or School)</label><input type="email" id="visitor-email" required>
+                    <div id="visitor-sent-msg" style="display:none; background: #ecfdf5; color: #065f46; padding: 1rem; border-radius: 12px; font-weight: 700; font-size: 0.9rem; text-align: center; margin-bottom: 1rem; border: 1.5px solid #10b981;">✓ Code sent! Check your inbox.</div>
+                    <div id="visitor-otp-block" style="display:none; margin-top: 1rem;">
+                        <label style="text-align: center; display: block; margin-bottom: 1.5rem;">Enter 6-Digit Code</label>
+                        <div class="otp-group">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 1)">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 2)">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 3)">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 4)">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 5)">
+                            <input type="text" maxlength="1" class="otp-field" onkeyup="handleOTP(this, 6)">
+                        </div>
+                        <input type="hidden" id="visitor-otp">
+                        <div id="visitor-code-error" class="error-msg"></div>
+                        <button type="button" class="btn-magenta" onclick="verifyVisitorOTP()"
+                            style="margin-top: 1.5rem; width: 100%;">Verify & Access Portal</button>
+                    </div>
+                    <div id="visitor-success" style="color: green; font-size: 0.85rem; text-align: center;"></div>
+                    <button type="submit" id="visitor-submit-btn" class="btn-magenta">Send Access Code</button>
+                    <a class="back-link" onclick="showAuthForm('menu')">← Back</a>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="app-container" style="display: none; height: 100vh; width: 100vw; display: flex;">
+        <nav class="sidebar">
+            <div class="sidebar-header" style="text-align: center;">
+                <img src="assets/logo.png" alt="STARS Logo" class="sidebar-logo"
+                    style="margin: 0 auto 2rem auto; display: block;">
+                <div class="acronym-stack">
+                    <div class="acronym-row"><b>S</b>isterhood</div>
+                    <div class="acronym-row"><b>T</b>enacity</div>
+                    <div class="acronym-row"><b>A</b>wareness</div>
+                    <div class="acronym-row"><b>R</b>esilience</div>
+                    <div class="acronym-row"><b>S</b>elf-love</div>
+                    <div class="acronym-institute">Institute</div>
+                </div>
+            </div>
+
+            <ul class="nav-links mt-4" id="dynamic-sidebar"></ul>
+
+            <div
+                style="margin-top: auto; padding: 1.5rem 2.5rem; border-top: 1px solid #f1f5f9; display: flex; align-items: center; gap: 0.75rem; position: relative;">
+                <div class="avatar" id="profile-initial"
+                    style="width: 35px; height: 35px; font-size: 0.9rem; background-color: var(--stars-magenta); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; flex-shrink: 0;">
+                    U</div>
+                <div style="flex: 1; min-width: 0;">
+                    <strong id="profile-name"
+                        style="font-size: 0.9rem; color: #1e293b; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">User</strong>
+                </div>
+                <button onclick="logout()" title="Log Out"
+                    style="background: none; border: none; cursor: pointer; color: #ef4444; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; font-family: var(--font-heading); transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;"
+                    onmouseover="this.style.background='#fee2e2'" onmouseout="this.style.background='none'">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <polyline points="16 17 21 12 16 7"></polyline>
+                        <line x1="21" y1="12" x2="9" y2="12"></line>
+                    </svg>
+                    Log Out
+                </button>
+            </div>
+        </nav>
+
+        <main class="main-content" id="dynamic-content-area">
+            <!-- DASHBOARD PAGE -->
+            <section id="dashboard" class="page active">
+                <div class="banner-block">
+                    <div>
+                        <h1>Welcome to STARS Institute</h1>
+                        <p>Sisterhood • Tenacity • Awareness • Resilience • Self-love</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <div id="dash-quick-actions" style="margin-bottom: 3rem;">
+                    <div class="section-title">QUICK ACTIONS</div>
+                    <div style="padding: 2rem; text-align: center; color: #94a3b8; font-weight: 600;">Loading live
+                        portal actions...</div>
+                </div>
+
+                <div id="dash-assigned-section" style="margin-bottom: 2rem;">
+                    <div id="dash-pair-section"></div>
+                </div>
+
+                <div id="dash-all-mentors-section" style="margin-top: 2rem;">
+                    <div id="dash-mentors-list-container" class="mentors-grid"></div>
+                </div>
+            </section>
+
+            <!-- FIND MENTORS PAGE -->
+            <section id="mentors" class="page">
+                <div class="fancy-pink-banner">
+                    <h2>ALL MENTORS</h2>
+                    <p>Discover and connect with our world-class STARS mentors.</p>
+                </div>
+
+                <div id="mentors-assigned-top" style="margin-bottom: 2rem; display: none;">
+                    <div class="section-title">YOUR MENTEES</div>
+                    <div id="mentors-pair-top-grid" class="mentors-grid">
+                        <!-- Yellow cards also shown here -->
+                    </div>
+                </div>
+
+                <div class="search-bar"
+                    style="margin-bottom: 3rem; background: white; border-radius: 16px; border: 1.5px solid #f1f5f9; padding: 0.25rem;">
+                    <div style="position: relative; width: 100%;">
+                        <svg style="position: absolute; left: 1.5rem; top: 50%; transform: translateY(-50%); color: var(--stars-magenta);"
+                            width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.5">
+                            <circle cx="11" cy="11" r="8"></circle>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                        </svg>
+                        <input type="text" id="mentor-search-input" class="search-input"
+                            style="width: 100%; padding: 1.25rem 1.25rem 1.25rem 4rem; border: none; background: transparent; outline: none; font-family: inherit; font-size: 1rem; font-weight: 500;"
+                            placeholder="Search mentors by name..." oninput="filterMentors()">
+                    </div>
+                </div>
+
+                <div class="mentors-grid" id="mentors-search-grid"></div>
+            </section>
+
+            <!-- MESSAGES PAGE -->
+            <section id="messages" class="page">
+                <div id="messages-header-injection"></div>
+                <div class="banner-block">
+                    <div>
+                        <h1>Messages</h1>
+                        <p>Sisterhood • Tenacity • Awareness • Resilience • Self-love</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <div id="message-selector-container">
+                    <div id="message-select-label" class="section-title">SELECT PARTNER</div>
+
+                    <div id="messages-search-container" style="margin-bottom: 1.5rem; display: none;">
+                        <input type="text" id="messages-search-input" placeholder="Search contacts..."
+                            oninput="window.renderMessages()"
+                            style="width: 100%; padding: 1.2rem 1.8rem; border-radius: 20px; border: 3px solid #f1f5f9; font-family: inherit; font-size: 1rem; outline: none; transition: 0.2s;" />
+                    </div>
+
+                    <div id="message-target-pills"
+                        style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 2rem;">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <div id="active-chat-container" class="chat-container-refined"
+                    style="background: white; border-radius: 24px; border: 1.5px solid #f1f5f9; min-height: 600px; display: none; flex-direction: column; margin-bottom: 3rem;">
+                    <div id="general-chat-header"
+                        style="background: var(--stars-magenta); padding: 1.5rem 2rem; color: white; display: flex; align-items: center; gap: 1rem;">
+                        <div id="chat-header-avatar"
+                            style="width: 45px; height: 45px; background: rgba(255,255,255,0.2); border-radius: 12px; display: flex; align-items: center; justify-content: center;">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="white" stroke="none">
+                                <path
+                                    d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                            </svg>
+                        </div>
+                        <div>
+                            <h2 id="chat-header-name" style="margin: 0; font-size: 1.15rem; font-weight: 800;">Chat</h2>
+                            <p id="chat-header-subtitle" class="chat-status-magenta-bold"
+                                style="margin: 0; color: white !important; font-weight: 700;"></p>
+                        </div>
+                    </div>
+
+                    <div class="chat-body" id="chat-body-content"
+                        style="flex: 1; padding: 2rem; overflow-y: auto; background: #fafafa; display: flex; flex-direction: column;">
+                        <div class="empty-state"
+                            style="height: 100%; display: flex; flex-direction:column; justify-content: center; align-items: center; color: #94a3b8;">
+                            <p>No messages yet. Start a conversation!</p>
+                        </div>
+                    </div>
+
+                    <div id="chat-input-container" class="chat-input-area"
+                        style="padding: 1.5rem 2rem; background: white; border-top: 1px solid #f1f5f9; display: flex; gap: 1rem; align-items: center;">
+                        <input type="text" id="chat-input" placeholder="Type your message here..."
+                            style="flex: 1; border: 1.5px solid #f1f5f9; border-radius: 12px; padding: 1rem 1.5rem; outline: none; font-family: inherit;"
+                            onkeypress="if(event.key === 'Enter') window.sendMessage(event)">
+                        <button class="btn-magenta-lg" onclick="window.sendMessage(event)"
+                            style="padding: 1rem 1.5rem; border-radius: 12px;">Send Message</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SESSIONS PAGE -->
+            <section id="sessions" class="page">
+                <!-- Mentee Backup Survey Links (Visible only to Mentees) -->
+                <div id="mentee-backup-surveys"
+                    style="display: none; background: #fff1f6; border: 2px solid #fce4ec; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem;">
+                    <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                        <div
+                            style="background: #e84393; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="16" y1="13" x2="8" y2="13"></line>
+                                <line x1="16" y1="17" x2="8" y2="17"></line>
+                                <polyline points="10 9 9 9 8 9"></polyline>
+                            </svg>
+                        </div>
+                        <div>
+                            <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b; font-weight: 800;">Emergency Survey
+                                Access</h3>
+                            <p style="margin: 0; font-size: 0.85rem; color: #64748b; font-weight: 600;">Use these links
+                                if your session survey doesn't appear automatically.</p>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u"
+                            target="_blank" class="btn-magenta"
+                            style="text-align: center; text-decoration: none; font-size: 0.9rem; padding: 0.8rem;">Pre-Session
+                            Survey</a>
+                        <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u"
+                            target="_blank" class="btn-magenta"
+                            style="text-align: center; text-decoration: none; font-size: 0.9rem; padding: 0.8rem;">Post-Session
+                            Survey</a>
+                    </div>
+                </div>
+
+                <div class="banner-block">
+                    <div>
+                        <h1>My Sessions</h1>
+                        <p>Sisterhood • Tenacity • Awareness • Resilience • Self-love</p>
+                    </div>
+                    <button class="btn-magenta"
+                        onclick="window.openScheduleModal(window.SELECTED_MENTEE_NAME || '', window.SELECTED_MENTEE_ID || '')"
+                        style="display: flex; align-items: center; gap: 1rem; border-radius: 12px; padding: 1rem 1.5rem; font-size: 1rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="3">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Schedule Session
+                    </button>
+                </div>
+
+                <div class="sessions-outer-container">
+                    <div class="session-tabs-wrap" style="display: flex; gap: 1rem; margin-bottom: 2rem;">
+                        <button class="pairing-pill active"
+                            onclick="window.setSessionFilter('Upcoming')">Upcoming</button>
+                        <button class="pairing-pill" onclick="window.setSessionFilter('Past')">Past</button>
+                    </div>
+
+                    <div id="sessions-list-container" class="mentors-grid">
+                        <!-- Redesigned session cards -->
+                    </div>
+
+                    <div id="counselor-session-controls">
+
+                        <!-- STATIC SESSIONS SEARCH -->
+                        <div id="sessions-search-container" style="margin-bottom: 2.5rem; display: none;">
+                            <input type="text" id="sessions-search-input" placeholder="Search mentee or mentor..."
+                                oninput="window.renderSessions(window.DASH_DATA.sessions)"
+                                style="width: 100%; padding: 1.2rem 1.8rem; border-radius: 20px; border: 3px solid #fce4ec; font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 600; color: #1e293b; background: white; outline: none; transition: 0.2s;" />
+                        </div>
+
+                        <div id="schedule-pairing-selector"
+                            style="display: flex; gap: 0.8rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                            <!-- JS injected selector pills -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SURVEY PAGE (REDESIGNED) -->
+            <section id="survey" class="page">
+                <div class="banner-block" style="margin-bottom: 2rem;">
+                    <div>
+                        <h1>Survey Responses Center</h1>
+                        <p>Insights, Analytics & Safeguarding</p>
+                    </div>
+                </div>
+
+                <!-- Survey Main Content -->
+                <div id="survey-content-hub">
+                    <!-- 1. MENTOR SAFEGUARDING HUB (Visible to Mentors Only) -->
+                    <div id="mentor-safeguarding-hub"
+                        style="display: none; background: #fff8f8; border: 2.5px solid #ffdde1; border-radius: 24px; padding: 2rem; margin-bottom: 2.5rem;">
+                        <div style="display: flex; align-items: flex-start; gap: 1.5rem;">
+                            <div
+                                style="background: #ef4444; color: white; width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5">
+                                    <path
+                                        d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z">
+                                    </path>
+                                    <line x1="12" y1="9" x2="12" y2="13"></line>
+                                    <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                                </svg>
+                            </div>
+                            <div style="flex: 1;">
+                                <h3 style="margin: 0; color: #b91c1c; font-size: 1.2rem; font-weight: 800;">Safeguarding
+                                    Emergency Trigger</h3>
+                                <p
+                                    style="margin: 0.5rem 0 1.5rem 0; color: #7f1d1d; font-size: 0.9rem; font-weight: 600; line-height: 1.5;">
+                                    If you have an immediate concern during or after a session, use the button below to
+                                    alert a counselor via Outlook. This will pre-fill a request for an emergency
+                                    session.</p>
+
+                                <div id="emergency-contact-selector"
+                                    style="margin-bottom: 1rem; display: flex; gap: 0.8rem; flex-wrap: wrap;">
+                                    <!-- Mentee selector for multi-pairing mentors -->
+                                </div>
+
+                                <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                                    <button id="btn-emergency-escalate" onclick="window.triggerEmergencyOutlook()"
+                                        class="btn-magenta"
+                                        style="background: #ef4444; border-color: #ef4444; border-radius: 12px; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.8rem; cursor: pointer; flex: 1; justify-content: center;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <path
+                                                d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                            </path>
+                                            <polyline points="22,6 12,13 2,6"></polyline>
+                                        </svg>
+                                        Send Email (Outlook)
+                                    </button>
+                                    <button id="btn-copy-prompt" onclick="window.copySafetyPrompt(event)"
+                                        class="btn-magenta"
+                                        style="background: #ef4444; border-color: #ef4444; border-radius: 12px; padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.8rem; cursor: pointer; flex: 1; justify-content: center;">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none"
+                                            stroke="currentColor" stroke-width="2.5">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                        Copy Request Prompt
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. MENTOR BACKUP LINKS (Redesigned to match Mentee Style) -->
+                    <div id="mentor-backup-surveys-footer"
+                        style="display: none; background: #fff1f6; border: 2px solid #fce4ec; border-radius: 20px; padding: 1.5rem; margin-bottom: 2rem;">
+                        <div style="display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem;">
+                            <div
+                                style="background: #e84393; color: white; width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2.5">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                    <polyline points="14 2 14 8 20 8"></polyline>
+                                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                                    <polyline points="10 9 9 9 8 9"></polyline>
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 style="margin: 0; font-size: 1.1rem; color: #1e293b; font-weight: 800;">Mentor
+                                    Backup Surveys</h3>
+                                <p style="margin: 0; font-size: 0.85rem; color: #64748b; font-weight: 600;">Use these
+                                    links if you need to submit a manual survey response.</p>
+                            </div>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                            <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UME9IRUhDR09RNTQ3RTEwMDlRMTFCRktUSy4u"
+                                target="_blank" class="btn-magenta"
+                                style="text-align: center; text-decoration: none; font-size: 0.9rem; padding: 0.8rem;">During-Session
+                                Survey</a>
+                            <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMUJWMVlYVEk0RDZDSjZaV0owRVQ4OFJINC4u"
+                                target="_blank" class="btn-magenta"
+                                style="text-align: center; text-decoration: none; font-size: 0.9rem; padding: 0.8rem;">Post-Session
+                                Survey</a>
+                        </div>
+                    </div>
+
+                    <!-- 3. COUNSELOR VIEW TOGGLE -->
+                    <div id="counselor-survey-toggle"
+                        style="display: none; background: white; border: 2.5px solid #fce4ec; border-radius: 20px; padding: 0.5rem; display: flex; gap: 0.5rem; margin-bottom: 2.5rem; max-width: 500px;">
+                        <button id="toggle-list" onclick="window.switchSurveyView('list')" class="pairing-pill active"
+                            style="flex: 1; margin: 0; border: none; border-radius: 15px;">Survey Responses</button>
+                        <button id="toggle-trends" onclick="window.switchSurveyView('trends')" class="pairing-pill"
+                            style="flex: 1; margin: 0; border: none; border-radius: 15px;">Data & Trends</button>
+                    </div>
+                </div>
+
+
+                <!-- 3. MAIN CONTENT AREAS -->
+                <div id="survey-list-view">
+                    <div id="survey-filters" style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap;">
+                        <!-- JS Rendered Filters -->
+                    </div>
+                    <div id="survey-responses-container" class="mentors-grid">
+                        <!-- Survey response cards -->
+                    </div>
+                </div>
+
+                <div id="survey-analytics-view" style="display: none;">
+                    <!-- Timeline Filters -->
+                    <div id="analytics-timeline-filters"
+                        style="display: flex; gap: 0.8rem; margin-bottom: 2.5rem; overflow-x: auto; padding-bottom: 0.5rem;">
+                        <button class="pairing-pill active" onclick="window.updateAnalyticsTimeframe(7)">1 Week</button>
+                        <button class="pairing-pill" onclick="window.updateAnalyticsTimeframe(14)">2 Weeks</button>
+                        <button class="pairing-pill" onclick="window.updateAnalyticsTimeframe(21)">3 Weeks</button>
+                        <button class="pairing-pill" onclick="window.updateAnalyticsTimeframe(30)">30 Days</button>
+                        <button class="pairing-pill" onclick="window.updateAnalyticsTimeframe(90)">90 Days</button>
+                    </div>
+
+                    <!-- Analytics Grid -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 2rem;">
+                        <div style="background: white; border: 2px solid #f1f5f9; border-radius: 24px; padding: 2rem;">
+                            <h3
+                                style="margin-top: 0; color: #1e293b; font-weight: 800; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                                Average Sentiment (Mood & Impact)</h3>
+                            <canvas id="sentimentBarChart" height="250"></canvas>
+                        </div>
+                        <div style="background: white; border: 2px solid #f1f5f9; border-radius: 24px; padding: 2rem;">
+                            <h3
+                                style="margin-top: 0; color: #1e293b; font-weight: 800; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                                Response Volume over Time</h3>
+                            <canvas id="volumeTrendChart" height="250"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+
+            </section>
+            <section id="resources" class="page">
+                <div class="banner-block">
+                    <div>
+                        <h1>Resources</h1>
+                        <p>Access program materials and student guides</p>
+                    </div>
+                    <button class="btn-magenta" onclick="window.openResourceUpload()" id="btn-upload-resource"
+                        style="display: flex; align-items: center; gap: 1rem; border-radius: 12px; padding: 1rem 1.5rem; font-size: 1rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="3">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Upload Resource
+                    </button>
+                </div>
+
+                <div class="search-bar" style="margin-bottom: 3rem;">
+                    <input type="text" class="search-input" placeholder="Search resources..."
+                        style="width:100%; padding:1.1rem; border-radius:12px; border:1px solid #f1f5f9; background:white;">
+                </div>
+
+                <div id="resource-list-grid" class="mentors-grid">
+                    <!-- Resource cards populate here -->
+                </div>
+            </section>
+
+            <!-- MY PROFILE PAGE -->
+            <section id="profile" class="page">
+                <div class="banner-block">
+                    <div>
+                        <h1>My Profile</h1>
+                        <p>Manage your account details and security</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.5rem;">
+                    <div class="pairing-card" style="background: white; border-color: #f1f5f9; padding: 2rem;">
+                        <div class="pairing-info-text">
+                            <span>FIRST NAME</span>
+                            <strong id="prof-fname" style="color: #1e293b; margin-top: 0.5rem;">Haya</strong>
+                        </div>
+                    </div>
+                    <div class="pairing-card" style="background: white; border-color: #f1f5f9; padding: 2rem;">
+                        <div class="pairing-info-text">
+                            <span>LAST NAME</span>
+                            <strong id="prof-lname" style="color: #1e293b; margin-top: 0.5rem;">Otefy</strong>
+                        </div>
+                    </div>
+                    <div class="pairing-card"
+                        style="background: white; border-color: #f1f5f9; padding: 2rem; grid-column: span 2;">
+                        <div class="pairing-info-text">
+                            <span>SCHOOL EMAIL</span>
+                            <strong id="prof-email"
+                                style="color: #1e293b; margin-top: 0.5rem;">514115@naischool.ae</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div
+                    style="margin-top: 3rem; background: white; border-radius: 24px; padding: 3rem; border: 1.5px solid #fce4ec;">
+                    <h3 style="color: var(--stars-magenta); margin-bottom: 1rem; font-family: var(--font-heading);">
+                        Security Settings</h3>
+                    <p style="color: #94a3b8; margin-bottom: 2rem;">Manage your password and session security.</p>
+                    <button class="btn-magenta-lg" onclick="resetPassword(this)" style="width: 100%;">Send Password
+                        Reset Email</button>
+                    <button class="btn btn-outline" onclick="logout()"
+                        style="width: 100%; margin-top: 1rem; border-radius: 12px; padding: 1rem; font-weight: 700;">Sign
+                        Out of Portal</button>
+                </div>
+            </section>
+
+            <section id="settings" class="page">
+                <!-- Pink Gradient Header Banner -->
+                <div class="banner-block">
+                    <div>
+                        <h1>Settings</h1>
+                        <p>Manage your account preferences</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <!-- Notification Preferences Card -->
+                <div style="border: 1.5px solid #f8cdda; border-radius: 16px; padding: 2rem 2.5rem; background: white;">
+                    <!-- Card Header -->
+                    <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.3rem;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--magenta)"
+                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                        </svg>
+                        <h3 style="margin: 0; font-size: 1.15rem; color: #1f2937;">Notification Preferences</h3>
+                    </div>
+                    <p style="color: #9ca3af; font-size: 0.9rem; margin: 0 0 1.8rem 0; padding-left: 2rem;">Choose what
+                        notifications you want to receive</p>
+
+                    <!-- Toggle Item 1: Enable Notifications -->
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 0; border-bottom: 1px solid #f3f4f6;">
+                        <div style="display: flex; align-items: center; gap: 1.2rem;">
+                            <div
+                                style="width: 42px; height: 42px; background: #fef1f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e84393"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 1rem; color: #1f2937;">Enable Notifications</h4>
+                                <p style="margin: 0.15rem 0 0 0; color: #9ca3af; font-size: 0.85rem;">Master switch for
+                                    all notifications</p>
+                            </div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-master" onclick="toggleSetting(this, 'master')"></div>
+                    </div>
+
+                    <!-- Toggle Item 2: Resource Uploads -->
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 0; border-bottom: 1px solid #f3f4f6;">
+                        <div style="display: flex; align-items: center; gap: 1.2rem;">
+                            <div
+                                style="width: 42px; height: 42px; background: #fef1f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e84393"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 1rem; color: #1f2937;">Resource Uploads</h4>
+                                <p style="margin: 0.15rem 0 0 0; color: #9ca3af; font-size: 0.85rem;">Get notified when
+                                    someone uploads a new resource</p>
+                            </div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-resources" onclick="toggleSetting(this, 'resources')">
+                        </div>
+                    </div>
+
+                    <!-- Toggle Item 3: Session Updates -->
+                    <div
+                        style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 0; border-bottom: 1px solid #f3f4f6;">
+                        <div style="display: flex; align-items: center; gap: 1.2rem;">
+                            <div
+                                style="width: 42px; height: 42px; background: #fef1f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e84393"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 1rem; color: #1f2937;">Session Updates</h4>
+                                <p style="margin: 0.15rem 0 0 0; color: #9ca3af; font-size: 0.85rem;">Get notified about
+                                    new sessions and schedule changes</p>
+                            </div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-sessions" onclick="toggleSetting(this, 'sessions')"></div>
+                    </div>
+
+                    <!-- Toggle Item 4: New Messages -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 1.2rem 0;">
+                        <div style="display: flex; align-items: center; gap: 1.2rem;">
+                            <div
+                                style="width: 42px; height: 42px; background: #fef1f6; border-radius: 10px; display: flex; align-items: center; justify-content: center;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e84393"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 style="margin: 0; font-size: 1rem; color: #1f2937;">New Messages</h4>
+                                <p style="margin: 0.15rem 0 0 0; color: #9ca3af; font-size: 0.85rem;">Get notified when
+                                    you receive new messages</p>
+                            </div>
+                        </div>
+                        <div class="toggle-switch" id="toggle-messages" onclick="toggleSetting(this, 'messages')"></div>
+                    </div>
+                </div>
+
+                <!-- Save Settings Button -->
+                <div style="display: flex; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button class="btn btn-primary" onclick="saveSettings()"
+                        style="padding: 0.8rem 2rem; font-size: 1rem; border-radius: 12px; background: linear-gradient(135deg, #e84393, #f78fb3); border: none; color: white; cursor: pointer; font-weight: 600; box-shadow: 0 4px 15px rgba(232, 67, 147, 0.3); transition: transform 0.15s, box-shadow 0.15s;"
+                        onmouseenter="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 20px rgba(232,67,147,0.4)'"
+                        onmouseleave="this.style.transform='none';this.style.boxShadow='0 4px 15px rgba(232,67,147,0.3)'">Save
+                        Settings</button>
+                </div>
+            </section>
+
+
+            <!-- Redundant survey-data section removed to unify counselor experience in 'survey' section -->
+
+            <!-- RESOURCE UPLOAD MODAL (Screen 3 Restoration) -->
+            <div id="resource-upload-modal-overlay"
+                style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+                <div class="calendar-modal"
+                    style="width: 450px; padding: 2.5rem; border-radius: 32px; background: white;">
+                    <div class="modal-header" style="margin-bottom: 2rem;">
+                        <h3
+                            style="color: var(--magenta); font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800;">
+                            Upload Resource</h3>
+                        <button onclick="window.closeResourceUpload()"
+                            style="border: none; background: transparent; font-size: 1.4rem; cursor: pointer; color: #9ca3af;">✕</button>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label
+                            style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem; display: block;">ITEM
+                            NAME</label>
+                        <input type="text" id="res-upload-name" placeholder="e.g. Session 1 Workbook"
+                            style="width: 100%; padding: 0.8rem 1rem; border-radius: 12px; border: 1.5px solid #f1f5f9; outline: none;">
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem;">
+                        <label
+                            style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem; display: block;">DESCRIPTION</label>
+                        <textarea id="res-upload-desc" placeholder="Briefly describe this resource..."
+                            style="width: 100%; padding: 0.8rem 1rem; border-radius: 12px; border: 1.5px solid #f1f5f9; outline: none; height: 80px; font-family: inherit;"></textarea>
+                    </div>
+
+                    <div style="margin-bottom: 1.5rem; display: flex; gap: 1rem;">
+                        <div style="flex: 1;">
+                            <label
+                                style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem; display: block;">CATEGORY</label>
+                            <select id="res-upload-category"
+                                style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1.5px solid #f1f5f9; background: white;">
+                                <option value="Tenacity">Tenacity</option>
+                                <option value="Sisterhood">Sisterhood</option>
+                                <option value="Awareness">Awareness</option>
+                                <option value="Resilience">Resilience</option>
+                                <option value="Self-Love">Self-Love</option>
+                            </select>
+                        </div>
+                        <div style="flex: 1;">
+                            <label
+                                style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.5rem; display: block;">TYPE</label>
+                            <select id="res-upload-type"
+                                style="width: 100%; padding: 0.8rem; border-radius: 12px; border: 1.5px solid #f1f5f9; background: white;">
+                                <option value="PDF">PDF Document</option>
+                                <option value="Video">Video Link</option>
+                                <option value="Worksheet">Worksheet</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="res-dropzone"
+                        style="border: 2px dashed #fce4ec; border-radius: 20px; padding: 2rem; text-align: center; color: #94a3b8; margin-bottom: 2rem; cursor: pointer; background: #fff5f8;"
+                        onclick="document.getElementById('res-file-input').click()">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2" style="margin-bottom: 0.5rem; opacity: 0.5;">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="17 8 12 3 7 8"></polyline>
+                            <line x1="12" y1="3" x2="12" y2="15"></line>
+                        </svg>
+                        <p style="font-size: 0.85rem; font-weight: 700;">Select Document to Upload</p>
+                        <input type="file" id="res-file-input" style="display: none;" onchange="handleFileSelect(this)">
+                        <div id="selected-filename"
+                            style="margin-top: 1.5rem; font-weight: 800; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase;">
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 1rem;">
+                        <button class="btn-white" style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 800;"
+                            onclick="window.closeResourceUpload()">Cancel</button>
+                        <button class="btn-magenta" id="res-confirm-btn"
+                            style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 800;"
+                            onclick="window.submitResourceUpload()">Post to Library</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- CONTACT SECTION START -->
+            <section id="contact" class="page">
+
+                <style>
+                    .contact-card-v2 {
+                        background: white;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 16px;
+                        padding: 2rem;
+                        margin-bottom: 1.5rem;
+                        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+                    }
+
+                    .contact-item-v2 {
+                        display: flex;
+                        align-items: flex-start;
+                        gap: 1.5rem;
+                        margin-bottom: 1.5rem;
+                    }
+
+                    .contact-item-v2:last-child {
+                        margin-bottom: 0;
+                    }
+
+                    .contact-icon-v2 {
+                        background: var(--pink-light);
+                        color: var(--magenta);
+                        padding: 0.75rem;
+                        border-radius: 12px;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    }
+
+                    .contact-info-v2 h4 {
+                        margin: 0 0 0.25rem 0;
+                        font-size: 0.9rem;
+                        color: #374151;
+                    }
+
+                    .contact-info-v2 p {
+                        margin: 0;
+                        color: #6b7280;
+                        font-size: 1rem;
+                    }
+
+                    .hours-row {
+                        display: flex;
+                        justify-content: space-between;
+                        padding: 0.75rem 0;
+                        border-bottom: 1px solid #f3f4f6;
+                    }
+
+                    .hours-row:last-child {
+                        border-bottom: none;
+                    }
+
+                    .hours-day {
+                        font-weight: 600;
+                        color: #374151;
+                    }
+
+                    .hours-time {
+                        color: var(--magenta);
+                        font-weight: 500;
+                    }
+                </style>
+                <div class="banner-block">
+                    <div>
+                        <h1>Contact Us</h1>
+                        <p>We're here to support your mentorship journey</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <div style="max-width: 600px; margin: 0 auto;">
+                    <!-- Card 1: Main Contact Info -->
+                    <div class="contact-card-v2">
+
+                        <div class="contact-item-v2">
+                            <div class="contact-icon-v2">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z">
+                                    </path>
+                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                </svg>
+                            </div>
+                            <div class="contact-info-v2">
+                                <h4>Email</h4>
+                                <p>Nabeera.n@naischool.ae</p>
+                            </div>
+                        </div>
+
+                        <div class="contact-item-v2">
+                            <div class="contact-icon-v2">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z">
+                                    </path>
+                                </svg>
+                            </div>
+                            <div class="contact-info-v2">
+                                <h4>Phone</h4>
+                                <p>+04 288 4844</p>
+                            </div>
+                        </div>
+
+                        <div class="contact-item-v2">
+                            <div class="contact-icon-v2">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                                    <circle cx="12" cy="10" r="3"></circle>
+                                </svg>
+                            </div>
+                            <div class="contact-info-v2">
+                                <h4>Location</h4>
+                                <p>STARS Institute</p>
+                                <p style="font-size: 0.9rem; color: #6b7280; font-weight: normal;">North American
+                                    International School Dubai, Mizhar</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Support Hours -->
+                    <div class="contact-card-v2">
+                        <h3 style="color: var(--magenta); margin: 0 0 1.5rem 0; font-size: 1.1rem;">Support Hours</h3>
+                        <div class="hours-row">
+                            <span class="hours-day">Monday – Friday</span>
+                            <span class="hours-time">9:00 AM – 6:00 PM</span>
+                        </div>
+                        <div class="hours-row">
+                            <span class="hours-day">Saturday</span>
+                            <span class="hours-time">10:00 AM – 4:00 PM</span>
+                        </div>
+                        <div class="hours-row">
+                            <span class="hours-day">Sunday</span>
+                            <span class="hours-time">Closed</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- CALENDAR SCHEDULING MODAL -->
+    <!-- SCHEDULING MODAL (Restoration Parity) -->
+    <div id="schedule-modal-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div class="calendar-modal" style="width: 440px; padding: 2.5rem; border-radius: 32px; background: white;">
+            <div class="modal-header" style="margin-bottom: 2rem;">
+                <h3
+                    style="color: var(--stars-magenta); font-family: 'Outfit', sans-serif; font-size: 1.4rem; font-weight: 800;">
+                    Schedule Session</h3>
+                <button onclick="closeScheduleModal()"
+                    style="border: none; background: transparent; font-size: 1.4rem; cursor: pointer; color: #9ca3af;">✕</button>
+            </div>
+
+            <!-- Step 1: Calendar Selection (Screen 4) -->
+            <div id="schedule-step-1">
+                <div
+                    style="background: var(--stars-pink-light); border-radius: 16px; padding: 1rem; margin-bottom: 2rem; display: flex; align-items: center; gap: 1rem;">
+                    <div id="selected-partner-avatar" class="avatar"
+                        style="width: 40px; height: 40px; font-size: 1rem; background: white; color: var(--stars-magenta);">
+                        ?</div>
+                    <div>
+                        <div
+                            style="font-size: 0.65rem; color: var(--stars-magenta); font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em;">
+                            SCHEDULING WITH</div>
+                        <div id="selected-partner-name"
+                            style="font-weight: 700; color: var(--text-dark); font-size: 1rem;">Loading...</div>
+                    </div>
+                </div>
+
+                <div class="custom-calendar"
+                    style="border: 1.5px solid #f1f5f9; border-radius: 20px; padding: 1.5rem; margin-bottom: 2.5rem;">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                        <button onclick="changeMonth(-1)"
+                            style="border: none; background: #fff5f8; border-radius: 10px; width: 36px; height: 36px; cursor: pointer; color: var(--stars-magenta); font-weight: 800;">&lt;</button>
+                        <span id="calendar-month-year"
+                            style="font-weight: 800; color: var(--text-dark); font-family: 'Outfit', sans-serif;">April
+                            2026</span>
+                        <button onclick="changeMonth(1)"
+                            style="border: none; background: #fff5f8; border-radius: 10px; width: 36px; height: 36px; cursor: pointer; color: var(--stars-magenta); font-weight: 800;">&gt;</button>
+                    </div>
+                    <div
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; text-align: center; margin-bottom: 0.5rem;">
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Su
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Mo
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Tu
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">We
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Th
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Fr
+                        </div>
+                        <div style="font-size: 0.7rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Sa
+                        </div>
+                    </div>
+                    <div id="calendar-days"
+                        style="display: grid; grid-template-columns: repeat(7, 1fr); gap: 0.5rem; text-align: center;">
+                    </div>
+                </div>
+                <button class="btn-white" style="width: 100%; padding: 1rem; border-radius: 12px; font-weight: 800;"
+                    onclick="closeScheduleModal()">Cancel</button>
+            </div>
+
+            <!-- Step 2: Time Selection View -->
+            <div id="schedule-step-2" style="display: none;">
+                <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 2rem;">
+                    <button onclick="window.switchScheduleStep(1)"
+                        style="border: none; background: transparent; cursor: pointer; color: #94a3b8; font-size: 1.25rem;">←</button>
+                    <span id="selected-date-display"
+                        style="font-weight: 700; color: var(--text-dark); font-size: 1.1rem;">Saturday, April 11</span>
+                </div>
+
+                <div style="margin-bottom: 2rem;">
+                    <label
+                        style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.8rem; display: block; text-transform: uppercase;">PICK
+                        A TIME</label>
+                    <input type="time" id="schedule-time-input"
+                        style="width: 100%; padding: 1rem; border-radius: 12px; border: 1.5px solid #fce4ec; font-size: 1.25rem; font-weight: 800; color: var(--stars-magenta); outline: none; background: #fff5f8;">
+                </div>
+
+                <div style="margin-bottom: 2.5rem;">
+                    <label
+                        style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.8rem; display: block; text-transform: uppercase;">MEETING
+                        LINK (OPTIONAL)</label>
+                    <input type="url" id="schedule-link-input" placeholder="https://teams.microsoft.com/..."
+                        style="width: 100%; padding: 1rem; border-radius: 12px; border: 1.5px solid #f1f5f9; font-size: 0.95rem; outline: none;">
+                </div>
+
+                <!-- NEW: Participant Selector for Counselors -->
+                <div id="counselor-participants-wrap" style="display: none; margin-bottom: 2.5rem;">
+                    <label
+                        style="font-size: 0.75rem; font-weight: 800; color: #64748b; margin-bottom: 0.8rem; display: block; text-transform: uppercase;">PARTICIPANTS</label>
+                    <select id="meeting-participants-select"
+                        style="width: 100%; padding: 1rem; border-radius: 12px; border: 1.5px solid #fce4ec; font-size: 1rem; font-weight: 700; color: var(--stars-magenta); background: #fff5f8; outline: none; cursor: pointer;">
+                        <option value="Mentee Only">Mentee Only (Private)</option>
+                        <option value="Mentee & Mentor">Mentee & Mentor</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <button class="btn-white" style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 800;"
+                        onclick="closeScheduleModal()">Cancel</button>
+
+                    <button class="btn-magenta" id="final-schedule-btn"
+                        style="flex: 1; padding: 1rem; border-radius: 12px; font-weight: 800;"
+                        onclick="window.submitSchedule()">Schedule Now</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- SURVEY SAFEGUARDING MODAL -->
+    <div id="survey-intercept-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.7); z-index: 20000; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+        <div
+            style="background: white; width: 450px; padding: 2.5rem; border-radius: 24px; text-align: center; box-shadow: 0 20px 50px rgba(0,0,0,0.2);">
+            <div
+                style="width: 70px; height: 70px; background: #fff1f6; color: var(--magenta); border-radius: 20px; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.5rem auto;">
+                <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+            </div>
+            <h2 style="font-family: var(--font-heading); font-weight: 800; color: #1f2937; margin-bottom: 0.8rem;">
+                Safety First</h2>
+            <p style="color: #6b7280; font-size: 1rem; line-height: 1.5; margin-bottom: 2rem;">Please complete your
+                mandatory **Pre-Session Survey** to unlock the meeting link. This helps us ensure your wellbeing.</p>
+
+            <a id="intercept-survey-link"
+                href="https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u"
+                target="_blank" class="btn btn-primary"
+                style="width: 100%; padding: 1rem; font-size: 1rem; margin-bottom: 1rem; display: block; background: var(--magenta); color: white; border-radius: 12px; font-weight: 700; text-decoration: none;">1.
+                Open Microsoft Survey</a>
+
+            <button id="verify-survey-btn" class="btn"
+                style="width: 100%; padding: 1rem; font-size: 1rem; border: 2px solid #e5e7eb; border-radius: 12px; font-weight: 700; color: #374151; background: white; cursor: pointer;"
+                onclick="window.verifySurveySubmission()">2. Verify & Join Meeting</button>
+            <p id="verify-status" style="font-size: 0.8rem; color: #e84393; margin-top: 1rem; display: none;">Verifying
+                submission...</p>
+
+            <button onclick="document.getElementById('survey-intercept-modal').style.display='none'"
+                style="margin-top: 1.5rem; background: none; border: none; color: #9ca3af; cursor: pointer; font-size: 0.9rem; text-decoration: underline;">Close</button>
+        </div>
+    </div>
+    <div id="mentor-profile-modal"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.5); z-index: 10000; align-items: center; justify-content: center;">
+        <div class="modal-sheet" style="width: 450px; text-align: center; background: white !important;">
+            <div style="display: flex; justify-content: flex-end;">
+                <button onclick="document.getElementById('mentor-profile-modal').style.display='none'"
+                    style="border: none; background: transparent; font-size: 1.2rem; cursor: pointer;">✕</button>
+            </div>
+            <div class="avatar" id="modal-mentor-avatar"
+                style="width: 80px; height: 80px; font-size: 2rem; margin: 0 auto 1rem; background: var(--pink-light); color: var(--magenta);">
+                M</div>
+            <h2 id="modal-mentor-name" style="margin-bottom: 0.5rem; color: var(--text-dark);">Mentor Name</h2>
+            <p id="modal-mentor-title"
+                style="color: var(--magenta); font-weight: bold; font-size: 0.85rem; margin-bottom: 1.5rem; text-transform: uppercase;">
+                STARS MENTOR</p>
+
+            <div style="text-align: left; margin-bottom: 1.5rem;">
+                <h4 style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">BIO</h4>
+                <p id="modal-mentor-bio" style="font-size: 0.9rem; line-height: 1.5; color: var(--text-dark);">Bio goes
+                    here...</p>
+            </div>
+
+            <div style="text-align: left; margin-bottom: 2rem;">
+                <h4 style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 0.5rem;">INTERESTS</h4>
+                <div id="modal-mentor-interests" style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                    <!-- Pills populated by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+
+    <!-- RESOURCE PREVIEW MODAL -->
+    <div id="resource-preview-modal" class="modal-overlay"
+        style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.8); z-index: 20000; align-items: center; justify-content: center;">
+        <div
+            style="width: 90%; height: 90%; background: white; border-radius: 20px; display: flex; flex-direction: column; overflow: hidden; position: relative;">
+            <div
+                style="padding: 1rem 2rem; background: #fff1f6; display: flex; justify-content: space-between; align-items: center;">
+                <h3 id="preview-filename" style="margin: 0; color: #e84393; font-weight: 800;">Resource Preview</h3>
+                <button onclick="window.closeResourcePreview()"
+                    style="border: none; background: #e84393; color: white; padding: 0.5rem 1rem; border-radius: 10px; font-weight: 800; cursor: pointer;">Close
+                    Preview</button>
+            </div>
+            <iframe id="resource-preview-iframe" style="flex: 1; border: none; width: 100%; height: 100%;"></iframe>
+        </div>
+    </div>
+</body>
+
+</html>

@@ -1,0 +1,73 @@
+/Users/hayaotefy/Library/Python/3.9/lib/python/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+Resend Integration (Requests) Ready
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+AUTHORITATIVE STARTUP SYNC: Ingesting Excel Files...
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+AUTHORITATIVE STARTUP SYNC COMPLETE.
+Serving STARS Python Backend at http://localhost:8000
+127.0.0.1 - - [21/Apr/2026 00:16:10] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:10] "GET /style.css?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:10] "GET /stars_core_v32.js?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:10] "GET /assets/logo.png HTTP/1.1" 200 -
+Supabase Token Verification Failed: invalid JWT: unable to parse or verify signature, token is malformed: token contains an invalid number of segments
+DASHBOARD ERROR: No user found in headers
+127.0.0.1 - - [21/Apr/2026 00:16:11] "GET /api/dashboard HTTP/1.1" 401 -
+127.0.0.1 - - [21/Apr/2026 00:16:13] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:13] "GET /style.css?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:13] "GET /stars_core_v32.js?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:13] "GET /assets/logo.png HTTP/1.1" 200 -
+POST Request: /api/visitor
+
+==================================================
+STARS VISITOR OTP GENERATED
+To: omarotefy2008@gmail.com
+CODE: 677535
+==================================================
+
+DEBUG: Using API Key: re_Y3...
+DEBUG: Attempting send to omarotefy2008@gmail.com...
+--- RESEND API Full Response ---
+Status Code: 403
+{
+  "statusCode": 403,
+  "name": "validation_error",
+  "message": "You can only send testing emails to your own email address (hayaotefy09@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain."
+}
+--------------------------------
+127.0.0.1 - - [21/Apr/2026 00:16:21] "POST /api/visitor HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:30] "GET /style.css?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:16:30] code 404, message File not found
+127.0.0.1 - - [21/Apr/2026 00:16:30] "GET /.well-known/appspecific/com.chrome.devtools.json HTTP/1.1" 404 -
+127.0.0.1 - - [21/Apr/2026 00:17:38] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:38] "GET /style.css?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:38] "GET /stars_core_v32.js?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:38] "GET /assets/logo.png HTTP/1.1" 200 -
+POST Request: /api/visitor
+
+==================================================
+STARS VISITOR OTP GENERATED
+To: omarotefy2008@gmail.com
+CODE: 943744
+==================================================
+
+DEBUG: Using API Key: re_Y3...
+DEBUG: Attempting send to omarotefy2008@gmail.com...
+--- RESEND API Full Response ---
+Status Code: 403
+{
+  "statusCode": 403,
+  "name": "validation_error",
+  "message": "You can only send testing emails to your own email address (hayaotefy09@gmail.com). To send emails to other recipients, please verify a domain at resend.com/domains, and change the `from` address to an email using this domain."
+}
+--------------------------------
+127.0.0.1 - - [21/Apr/2026 00:17:45] "POST /api/visitor HTTP/1.1" 200 -
+POST Request: /api/visitor/verify
+127.0.0.1 - - [21/Apr/2026 00:17:53] "POST /api/visitor/verify HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:53] "GET /api/dashboard HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /style.css?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /stars_core_v32.js?v=7.4 HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /assets/logo.png HTTP/1.1" 200 -

@@ -1,0 +1,12 @@
+[
+    {
+        "id": 1,
+        "mentor_email": "mentor@naischool.ae",
+        "mentee_email": "mentee1@naischool.ae"
+    },
+    {
+        "id": 2,
+        "mentor_email": "mentor@naischool.ae",
+        "mentee_email": "mentee2@naischool.ae"
+    }
+]

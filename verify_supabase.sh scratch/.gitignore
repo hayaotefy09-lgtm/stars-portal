@@ -1,0 +1,4 @@
+verify_supabase.sh
+scratch/
+*.db
+*.xlsx.bak

@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STARS - Backend Admin Console</title>
+    <!-- Priority Engine Lock -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="stars_core_v30.js?v=30"></script>
+    <link rel="stylesheet" href="style.css?v=30">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --magenta: #e84393;
+            --magenta-hover: #d81b60;
+            --pink-light: #fce7f3;
+            --pink-border: #fbcfe8;
+            --text-dark: #2d3436;
+            --text-muted: #6b7280;
+            --bg-main: #fdf2f8;
+            --font-heading: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font-body); background: var(--bg-main); color: var(--text-dark); min-height: 100vh; overflow-x: hidden; }
+
+        .gateway {
+            position: fixed; inset: 0; background: var(--bg-main);
+            display: flex; align-items: center; justify-content: center; z-index: 10000;
+        }
+        .gateway.hidden { display: none !important; pointer-events: none; }
+
+        .gateway-card {
+            background: white; padding: 3rem; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--pink-border); width: 100%; max-width: 400px; text-align: center;
+        }
+        .gateway-card h2 { color: var(--magenta); margin-bottom: 2rem; font-weight: 800; }
+
+        input, select, textarea {
+            width: 100%; padding: 0.8rem; border: 1px solid #ddd; border-radius: 8px;
+            margin-bottom: 1rem; font-family: inherit;
+        }
+
+        .btn { padding: 0.8rem 1.5rem; border-radius: 8px; border: none; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .btn-primary { background: var(--magenta); color: white; }
+        .btn-primary:hover { background: var(--magenta-hover); transform: translateY(-1px); }
+        .btn-danger { background: #fee2e2; color: #ef4444; border: 1px solid #fecaca; }
+
+        .dashboard { display: none; padding: 2rem; max-width: 1200px; margin: 0 auto; z-index: 1; }
+        .dashboard.active { display: block !important; }
+
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; border-bottom: 2px solid var(--pink-light); padding-bottom: 1rem; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; border-bottom: 1px solid var(--pink-border); padding-bottom: 1rem; }
+        .tab-btn { background: none; border: 1px solid transparent; padding: 0.6rem 1.2rem; font-weight: 700; cursor: pointer; color: var(--text-muted); border-radius: 8px; }
+        .tab-btn.active { color: var(--magenta); background: var(--pink-light); border-color: var(--pink-border); }
+
+        .section { display: none; background: white; padding: 2.5rem; border-radius: 16px; border: 1px solid var(--pink-border); }
+        .section.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        th { text-align: left; padding: 1rem; border-bottom: 2px solid var(--pink-light); color: var(--text-muted); font-size: 0.9rem; }
+        td { padding: 1rem; border-bottom: 1px solid var(--pink-light); }
+        .pill { padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+        .pill.mentor { background: #fef9c3; color: #854d0e; }
+        .pill.mentee { background: #dcfce7; color: #166534; }
+        .pill.staff { background: #e0e7ff; color: #3730a3; }
+
+        /* Unified Modal UI */
+        .stars-modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.7);
+            backdrop-filter: blur(8px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            padding: 1rem;
+        }
+        .stars-modal {
+            background: white;
+            padding: 2.5rem;
+            border-radius: 28px;
+            width: 100%;
+            max-width: 440px;
+            text-align: center;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.25);
+            border: 2px solid #fce4ec;
+            transform: scale(0.9);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .stars-modal.active { transform: scale(1); opacity: 1; }
+        .stars-modal h3 { font-family: 'Outfit', sans-serif; color: #1e293b; font-size: 1.5rem; margin-bottom: 0.75rem; font-weight: 800; }
+        .stars-modal p { color: #64748b; line-height: 1.6; margin-bottom: 2rem; font-size: 1rem; }
+        .modal-action-row { display: flex; gap: 1rem; }
+        .modal-action-row button { flex: 1; padding: 1.1rem; border-radius: 14px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; transition: 0.2s; }
+        .modal-cancel { background: #f1f5f9; color: #475569; }
+        .modal-confirm { background: #ef4444; color: white; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2); }
+        .modal-cancel:hover { background: #e2e8f0; }
+        .modal-confirm:hover { background: #dc2626; transform: translateY(-2px); }
+    </style>
+</head>
+
+<body>
+    <!-- Persistent Modal Container -->
+    <div id="stars-modal-overlay" class="stars-modal-overlay">
+        <div id="stars-modal" class="stars-modal">
+            <h3 id="stars-modal-title">Confirm Action</h3>
+            <p id="stars-modal-body">Proceed with this administrative action?</p>
+            <div class="modal-action-row">
+                <button type="button" class="modal-cancel" onclick="window.closeStarsModal()">Cancel</button>
+                <button type="button" class="modal-confirm" id="stars-modal-confirm-btn">Confirm</button>
+            </div>
+        </div>
+    </div>
+    <div id="admin-gateway" class="gateway">
+        <div class="gateway-card">
+            <h2 style="font-family: var(--font-heading);">Backend Access</h2>
+            <form onsubmit="event.preventDefault(); starsMasterLogin(); return false;">
+                <input type="password" id="admin-password" placeholder="Master Password" required>
+                <div id="admin-error" style="font-size: 0.85rem; margin-bottom: 1rem; min-height: 1.2rem;"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%">Enter Management Portal</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="admin-portal" class="dashboard">
+        <div class="header">
+            <h1 style="font-family: var(--font-heading); font-weight: 800; color: var(--magenta);">STARS Registry</h1>
+            <button class="btn" style="background:var(--pink-light); color:var(--magenta);" onclick="logoutAdmin()">Logout</button>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="switchTab('users', this)">Users</button>
+            <button class="tab-btn" onclick="switchTab('pairings', this)">Pairings</button>
+            <button class="tab-btn" onclick="switchTab('profiles', this)">Profiles</button>
+        </div>
+
+        <div id="section-users" class="section active">
+            <div style="display:grid; grid-template-columns: 1fr 2fr; gap: 2rem; margin-bottom: 2rem;">
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: var(--magenta);">Register New Member</h3>
+                    <input type="text" id="c-fname" placeholder="First Name">
+                    <input type="text" id="c-lname" placeholder="Last Name">
+                    <input type="email" id="c-email" placeholder="Email Address">
+                    <select id="c-role">
+                        <option value="Mentee">Mentee</option>
+                        <option value="Mentor">Mentor</option>
+                        <option value="ProgramStaff">Program Staff</option>
+                    </select>
+                    <button class="btn btn-primary" onclick="createUser()" style="width: 100%;">Create Account</button>
+                    <div id="create-success" style="color: #059669; margin-top: 1rem; font-weight: 700; display: none; text-align: center; border: 1.5px solid #059669; padding: 0.5rem; border-radius: 12px; background: #ecfdf5;">Account Created Successfully! ✅</div>
+                    <div id="create-error" style="color: #dc2626; margin-top: 1rem; font-weight: 700; display: none; text-align: center; border: 1.5px solid #fecaca; padding: 0.5rem; border-radius: 12px; background: #fef2f2;"></div>
+                </div>
+                <div>
+                    <div style="margin-bottom: 1.5rem;">
+                        <input type="text" id="admin-user-search" placeholder="Search by name or email..." 
+                               onkeyup="filterUsers()" 
+                               style="padding: 1rem; border-radius: 12px; border: 2px solid var(--pink-border); background: #fff1f6; font-weight: 600;">
+                    </div>
+                    <table>
+                        <thead>
+                            <tr><th>Role</th><th>Name</th><th>Email</th><th>Action</th></tr>
+                        </thead>
+                        <tbody id="users-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-pairings" class="section">
+            <div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 2rem;">
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: var(--magenta);">Create Pairing</h3>
+                    <label>Mentor</label><select id="p-mentor"></select>
+                    <label>Mentee</label><select id="p-mentee"></select>
+                    <button class="btn btn-primary" onclick="pairUsers()" style="width: 100%;">Establish Link</button>
+                    <div id="pair-success" style="color: #059669; margin-top: 1rem; font-weight: 700; display: none; text-align: center; border: 1.5px solid #059669; padding: 0.5rem; border-radius: 12px; background: #ecfdf5;">Pairing Established Successfully! ✅</div>
+                </div>
+                <div>
+                    <h3 style="margin-bottom: 1rem; color: var(--magenta);">Live Pairings</h3>
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" id="admin-pair-search" placeholder="Search pairings..." 
+                               onkeyup="filterPairings()" 
+                               style="padding: 0.8rem; border-radius: 12px; border: 2px solid var(--pink-border); background: #fff1f6; font-weight: 600; width: 100%;">
+                    </div>
+                    <table>
+                        <thead><tr><th>Mentor</th><th>Mentee</th><th>Action</th></tr></thead>
+                        <tbody id="pairs-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div id="section-profiles" class="section">
+             <h3 style="margin-bottom: 1rem; color: var(--magenta);">Global Profile Management</h3>
+             <select id="edit-member-select" onchange="loadMemberToEdit()"></select>
+             <div id="edit-form" style="display:none; margin-top: 1rem;">
+                 <label>Title</label><input type="text" id="edit-title">
+                 <label>Bio</label><textarea id="edit-bio" rows="4"></textarea>
+                 <label>Interests</label><textarea id="edit-interests" rows="2"></textarea>
+                 <button class="btn btn-primary" onclick="saveProfile()">Update Profile</button>
+                 <div id="profile-success" style="color: #059669; margin-top: 1rem; font-weight: 700; display: none; text-align: center; border: 1.5px solid #059669; padding: 0.5rem; border-radius: 12px; background: #ecfdf5;">Profile Updated Successfully! ✅</div>
+             </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DECOUPLED AUTH HEAD ENGINE ---
+        const MASTER_PASS = "STARS2026";
+        const API_URL = "http://localhost:8000";
+
+        function starsMasterLogin() {
+            const pass = document.getElementById('admin-password').value;
+            const err = document.getElementById('admin-error');
+            const btn = document.querySelector('.gateway-card button');
+            
+            console.log("AUTH_GATEWAY: Click registered.");
+            
+            if (pass === MASTER_PASS) {
+                console.info("AUTH_GATEWAY: Access granted.");
+                sessionStorage.setItem('stars_admin_pass_verified', 'true');
+                if (btn) { btn.disabled = true; btn.innerText = "ACCESS GRANTED..."; btn.style.backgroundColor = "#059669"; }
+                if (err) { err.style.color = "#059669"; err.innerText = "Identity Confirmed. Entering..."; }
+                setTimeout(portalVisibility, 800, true);
+            } else {
+                console.warn("AUTH_GATEWAY: Access denied.");
+                if (err) { err.style.color = "red"; err.innerText = "Invalid master password."; }
+            }
+        }
+
+        function portalVisibility(show) {
+            console.log("AUTH_GATEWAY: Swapping visibility...", show);
+            const gateway = document.getElementById('admin-gateway');
+            const portal = document.getElementById('admin-portal');
+            if (show) {
+                if (gateway) gateway.classList.add('hidden');
+                if (portal) portal.classList.add('active');
+                if (typeof loadData === 'function') loadData();
+            } else {
+                if (gateway) gateway.classList.remove('hidden');
+                if (portal) portal.classList.remove('active');
+            }
+        }
+
+        window.addEventListener('load', () => {
+            if (sessionStorage.getItem('stars_admin_pass_verified') === 'true') {
+                portalVisibility(true);
+            }
+        });
+
+        // --- ADMINISTRATIVE HELPERS ---
+        let allUsers = [];
+        let allPairs = [];
+
+        function switchTab(s, b) {
+            document.querySelectorAll('.section').forEach(x => x.classList.remove('active'));
+            document.getElementById('section-' + s).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+        }
+
+        function logoutAdmin() {
+            sessionStorage.removeItem('stars_admin_pass_verified');
+            location.reload();
+        }
+
+        function filterUsers() {
+            const query = document.getElementById('admin-user-search').value.toLowerCase();
+            const filtered = allUsers.filter(u => 
+                (u.name || '').toLowerCase().includes(query) || 
+                (u.email || '').toLowerCase().includes(query)
+            );
+            renderUsersTable(filtered);
+        }
+
+        function filterPairings() {
+            const query = document.getElementById('admin-pair-search').value.toLowerCase();
+            const filtered = allPairs.filter(p => 
+                (p.mentor || '').toLowerCase().includes(query) || 
+                (p.mentee || '').toLowerCase().includes(query)
+            );
+            renderPairsTable(filtered);
+        }
+
+        function renderUsersTable(users) {
+            let uHTML = '';
+            users.forEach(u => {
+                const p = u.role === 'Mentor' ? 'mentor' : (u.role === 'ProgramStaff' ? 'staff' : 'mentee');
+                uHTML += `<tr><td><span class="pill ${p}">${u.role}</span></td><td>${u.name}</td><td>${u.email}</td><td><button type="button" class="btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="deleteUser(event, '${u.email}')">Del</button></td></tr>`;
+            });
+            document.getElementById('users-body').innerHTML = uHTML || '<tr><td colspan="4">No users found in registry.</td></tr>';
+        }
+
+        function renderPairsTable(pairs) {
+            let pHTML = '';
+            pairs.forEach(p => {
+                pHTML += `<tr><td>${p.mentor}</td><td>${p.mentee}</td><td><button type="button" class="btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="deletePair(event, '${p.pair_id}')">Unpair</button></td></tr>`;
+            });
+            document.getElementById('pairs-body').innerHTML = pHTML || '<tr><td colspan="3">No active pairings found.</td></tr>';
+        }
+
+        async function loadData() {
+            try {
+                console.log("ADMIN: Polling Backend...");
+                const res = await fetch(`${API_URL}/api/admin/data`, { headers: { 'X-Admin-Bypass': 'STARS2026' } });
+                const data = await res.json();
+                allUsers = data.users || [];
+                const localPairs = data.pairs || [];
+
+                renderUsersTable(allUsers);
+                allPairs = data.pairs || [];
+                renderPairsTable(allPairs);
+
+                let mOpts = '<option value="">-- Choose Mentor --</option>';
+                let sOpts = '<option value="">-- Choose Mentee --</option>';
+                let eOpts = '<option value="">-- Select Member --</option>';
+
+                allUsers.forEach(u => {
+                    if (u.role === 'Mentor') mOpts += `<option value="${u.email}">${u.name} (${u.email})</option>`;
+                    if (u.role === 'Mentee') sOpts += `<option value="${u.email}">${u.name} (${u.email})</option>`;
+                    eOpts += `<option value="${u.email}">${u.name} (${u.email})</option>`;
+                });
+                
+                // Authoritative Dropdown Population (Hardened)
+                const populateSelect = (id, options) => {
+                    const el = document.getElementById(id);
+                    if (el) {
+                        el.innerHTML = options;
+                        const count = el.options.length - 1; // subtract default
+                        console.log(`ADMIN: Populated [${id}] with ${count} items.`);
+                    }
+                };
+
+                populateSelect('p-mentor', mOpts);
+                populateSelect('p-mentee', sOpts);
+                populateSelect('edit-member-select', eOpts);
+            } catch (e) {
+                console.error("ADMIN: Fetch error", e);
+            }
+        }
+
+        window.showStarsConfirm = function(title, body, onConfirm) {
+            const overlay = document.getElementById('stars-modal-overlay');
+            const modal = document.getElementById('stars-modal');
+            const titleEl = document.getElementById('stars-modal-title');
+            const bodyEl = document.getElementById('stars-modal-body');
+            const confirmBtn = document.getElementById('stars-modal-confirm-btn');
+            titleEl.textContent = title;
+            bodyEl.textContent = body;
+            overlay.style.display = 'flex';
+            setTimeout(() => modal.classList.add('active'), 10);
+            confirmBtn.onclick = async () => {
+                confirmBtn.disabled = true;
+                await onConfirm();
+                window.closeStarsModal();
+                confirmBtn.disabled = false;
+            };
+        };
+
+        window.closeStarsModal = function() {
+            const overlay = document.getElementById('stars-modal-overlay');
+            const modal = document.getElementById('stars-modal');
+            modal.classList.remove('active');
+            setTimeout(() => { overlay.style.display = 'none'; }, 300);
+        };
+
+        async function deleteUser(event, e) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            window.showStarsConfirm(
+                "Delete User?",
+                `Are you sure you want to permanently delete account ${e}?`,
+                async () => {
+                    const res = await fetch(`${API_URL}/api/hard-delete?table=users&email=${e}`, { method: 'DELETE', headers: { 'X-Admin-Bypass': 'STARS2026' } });
+                    if (res.ok) loadData();
+                }
+            );
+        }
+
+        async function deletePair(event, id) {
+            if (event) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            window.showStarsConfirm(
+                "Dissolve Pairing?",
+                "Are you sure you want to remove this mentor-mentee link?",
+                async () => {
+                    await fetch(`${API_URL}/api/hard-delete?table=mentor_mentee_pairs&id=${id}`, { method: 'DELETE', headers: { 'X-Admin-Bypass': 'STARS2026' } });
+                    loadData();
+                }
+            );
+        }
+
+        async function createUser() {
+            const firstName = document.getElementById('c-fname').value;
+            const lastName = document.getElementById('c-lname').value;
+            const email = document.getElementById('c-email').value;
+            const role = document.getElementById('c-role').value;
+            
+            const successMsg = document.getElementById('create-success');
+            const errorMsg = document.getElementById('create-error');
+            
+            if (successMsg) successMsg.style.display = 'none';
+            if (errorMsg) errorMsg.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/create`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Bypass': 'STARS2026' },
+                    body: JSON.stringify({ email, firstName, lastName, role })
+                });
+                
+                const result = await res.json();
+                
+                if (res.ok) {
+                    if (successMsg) {
+                        successMsg.style.display = 'block';
+                        setTimeout(() => successMsg.style.display = 'none', 3000);
+                    }
+                    // Clear fields
+                    document.getElementById('c-fname').value = '';
+                    document.getElementById('c-lname').value = '';
+                    document.getElementById('c-email').value = '';
+                } else {
+                    if (errorMsg) {
+                        errorMsg.textContent = `❌ ${result.error || 'Failed to create account.'}`;
+                        errorMsg.style.display = 'block';
+                    }
+                }
+            } catch (err) {
+                if (errorMsg) {
+                    errorMsg.textContent = `❌ Connectivity Error: ${err.message}`;
+                    errorMsg.style.display = 'block';
+                }
+            }
+            loadData();
+        }
+
+        async function pairUsers() {
+            const m = document.getElementById('p-mentor').value;
+            const s = document.getElementById('p-mentee').value;
+            if (!m || !s) { alert("Please select both a mentor and a mentee."); return; }
+            
+            try {
+                const res = await fetch(`${API_URL}/api/admin/pair`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Admin-Bypass': 'STARS2026' },
+                    body: JSON.stringify({ mentor: m, mentee: s })
+                });
+
+                if (res.ok) {
+                    const successMsg = document.getElementById('pair-success');
+                    if (successMsg) {
+                        successMsg.style.display = 'block';
+                        setTimeout(() => successMsg.style.display = 'none', 3000);
+                    }
+                    loadData(); // Refresh lists
+                } else {
+                    const result = await res.json();
+                    alert(`Error Establishing Link: ${result.error || 'Unknown Error'}`);
+                }
+            } catch (err) {
+                alert(`Connectivity error: ${err.message}`);
+            }
+        }
+
+        function loadMemberToEdit() {
+            const e = document.getElementById('edit-member-select').value;
+            const u = allUsers.find(x => x.email === e);
+            if (u) {
+                document.getElementById('edit-form').style.display = 'block';
+                document.getElementById('edit-title').value = u.title || '';
+                document.getElementById('edit-bio').value = u.bio || '';
+                document.getElementById('edit-interests').value = u.interests || '';
+            }
+        }
+
+        async function saveProfile() {
+            const e = document.getElementById('edit-member-select').value;
+            const p = {
+                title: document.getElementById('edit-title').value,
+                bio: document.getElementById('edit-bio').value,
+                interests: document.getElementById('edit-interests').value
+            };
+            const sb = await window.STARS_AUTHORITY;
+            const { data } = await sb.from('profiles').select('id').eq('email', e).single();
+            if (data) {
+                await sb.from('profiles').update(p).eq('id', data.id);
+                const successMsg = document.getElementById('profile-success');
+                if (successMsg) {
+                    successMsg.style.display = 'block';
+                    setTimeout(() => successMsg.style.display = 'none', 3000);
+                }
+                loadData();
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            if (sessionStorage.getItem('stars_admin_pass_verified') === 'true') {
+                loadData();
+            }
+        });
+    </script>
+</body>
+</html>
