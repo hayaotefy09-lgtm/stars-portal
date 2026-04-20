@@ -98,7 +98,7 @@ window.showPage = function (pageId, el) {
 window.logout = function () { StarsSession.clear(); location.reload(); };
 
 // 3. NUCLEAR MANAGEMENT HANDLERS (Consolidated Custom Modal Confirmation)
-window.starsConfirm = function(msg, onConfirm) {
+window.starsConfirm = function (msg, onConfirm) {
     let m = document.getElementById('stars-confirm-modal');
     if (!m) {
         m = document.createElement('div');
@@ -119,30 +119,30 @@ window.starsConfirm = function(msg, onConfirm) {
         `;
         document.body.appendChild(m);
     }
-    
+
     document.getElementById('stars-confirm-msg').textContent = msg;
     m.style.display = 'flex';
-    
+
     const yes = document.getElementById('stars-confirm-yes');
     const no = document.getElementById('stars-confirm-no');
-    
+
     // Clean up previous listeners
     const newYes = yes.cloneNode(true);
     const newNo = no.cloneNode(true);
     yes.parentNode.replaceChild(newYes, yes);
     no.parentNode.replaceChild(newNo, no);
-    
+
     newYes.onclick = () => { m.style.display = 'none'; onConfirm(); };
     newNo.onclick = () => { m.style.display = 'none'; };
 };
 
-window.trashSurveySubmission = function(email, timestamp, type, btn) {
+window.trashSurveySubmission = function (email, timestamp, type, btn) {
     window.starsConfirm("Are you sure you want to permanently delete this survey submission from both the database and the source Excel file?", async () => {
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
         try {
             const res = await fetch('/api/survey/delete', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${StarsSession.get().token}`
                 },
@@ -151,7 +151,7 @@ window.trashSurveySubmission = function(email, timestamp, type, btn) {
             const data = await res.json();
             if (data.status === 'success' || data.success) {
                 alert("✓ Success: Record permanently removed.");
-                await window.initSurveyCenter(); 
+                await window.initSurveyCenter();
             } else {
                 alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -163,13 +163,13 @@ window.trashSurveySubmission = function(email, timestamp, type, btn) {
     });
 };
 
-window.trashSession = function(sessionId, btn) {
+window.trashSession = function (sessionId, btn) {
     window.starsConfirm("Are you sure you want to cancel and permanently delete this session?", async () => {
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
         try {
             const res = await fetch('/api/sessions/delete', {
                 method: 'POST',
-                headers: { 
+                headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${StarsSession.get().token}`
                 },
@@ -181,7 +181,7 @@ window.trashSession = function(sessionId, btn) {
                 if (window.DASH_DATA && window.DASH_DATA.sessions) {
                     window.DASH_DATA.sessions = window.DASH_DATA.sessions.filter(s => s.id !== sessionId);
                 }
-                window.showPage('sessions'); 
+                window.showPage('sessions');
             } else {
                 alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -221,7 +221,7 @@ window.handleAuthSubmit = async function (event, type) {
                 body: JSON.stringify({ email: visitorEmail, firstName: document.getElementById('visitor-fname').value, lastName: document.getElementById('visitor-lname').value })
             });
             if (!res.ok) throw new Error("Failed to request code.");
-            
+
             const visitorData = await res.json();
             const msgEl = document.getElementById('visitor-sent-msg');
             if (visitorData.otp) {
@@ -318,7 +318,7 @@ window.handleOTP = function (el, idx) {
         const next = el.nextElementSibling;
         if (next) next.focus();
     }
-    
+
     // Aggregate digits
     const boxes = document.querySelectorAll('.otp-field');
     let code = "";
@@ -383,21 +383,23 @@ async function initDashboard() {
             }).join('');
 
             // Program Staff still see management but restricted
-            if (isStaffOnly || isCounselor) {
-                sidebar.innerHTML += `<li class="sidebar-btn" onclick="window.location.href='admin.html'" style="color:#e84393; font-weight:800; background:#fff1f6;">Management Console</li>`;
+            // This replaces the old email check and lets anyone with a counselor role in
+            if (user.role === 'Program Manager' || user.role === 'Counselor' || isCounselor) {
+                sidebar.innerHTML += `<li class="sidebar-btn" onclick="window.location.href='/admin.html'" style="color:#e84393; font-weight:800; background:#fff1f6;">Management Console</li>`;
             }
         }
-        window.showPage('dashboard');
-        // Populate Profile page
-        if (document.getElementById('prof-fname')) document.getElementById('prof-fname').textContent = fname;
-        if (document.getElementById('prof-lname')) document.getElementById('prof-lname').textContent = lname;
-        if (document.getElementById('prof-email')) document.getElementById('prof-email').textContent = user.email || 'user@naischool.ae';
-
-        dismissLoader();
-    } catch (e) {
-        log(`Dash error: ${e.message}`);
-        dismissLoader();
     }
+        window.showPage('dashboard');
+    // Populate Profile page
+    if (document.getElementById('prof-fname')) document.getElementById('prof-fname').textContent = fname;
+    if (document.getElementById('prof-lname')) document.getElementById('prof-lname').textContent = lname;
+    if (document.getElementById('prof-email')) document.getElementById('prof-email').textContent = user.email || 'user@naischool.ae';
+
+    dismissLoader();
+} catch (e) {
+    log(`Dash error: ${e.message}`);
+    dismissLoader();
+}
 }
 
 function dismissLoader() {
@@ -921,7 +923,7 @@ window.syncChat = async function () {
     if (body) {
         const u = StarsSession.get().user;
         const isCounselor = !!u.isCounselor || !!u.is_counselor || u.role === 'ProgramStaff';
-        
+
         // Find the current pair to identify mentor/mentee roles for counselor view
         const currentPair = window.DASH_DATA?.pairs?.find(p => String(p.pair_id) === String(window.CURRENT_CHAT_PAIR));
 
@@ -933,10 +935,10 @@ window.syncChat = async function () {
             if (isCounselor && currentPair) {
                 const isMentor = m.sender === currentPair.mentor_email;
                 const isMentee = m.sender === currentPair.mentee_email;
-                
+
                 // USER REQUEST: Mentor on right (sent style), Mentee on left (received style)
                 bubbleClass = isMentor ? 'sent' : 'received';
-                
+
                 // Add explicit labels for counselor clarity
                 const roleLabel = isMentor ? 'Mentor' : 'Mentee';
                 const senderName = isMentor ? currentPair.mentor_name : currentPair.mentee_name;
@@ -1240,7 +1242,7 @@ window.renderResources = (r) => {
     const g = document.getElementById('resource-list-grid');
     if (!g) return;
     const user = StarsSession.get()?.user;
-    
+
     // Hide upload for Mentees and Visitors (Restricted access)
     const uploadBtn = document.getElementById('btn-upload-resource');
     if (uploadBtn) uploadBtn.style.display = (user?.role === 'Mentee' || user?.role === 'Visitor' ? 'none' : 'flex');
