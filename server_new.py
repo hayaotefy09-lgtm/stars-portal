@@ -1264,33 +1264,30 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         
         if not name:
             self.send_response(400); self.end_headers(); return
-            
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        # 1. IMMEDIATE LOCAL SYNC
-        c.execute("INSERT INTO Resources (name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                  (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
-        conn.commit()
-        conn.close()
-
-        # 2. INSTANT RESPONSE TO UNBLOCK FRONTEND
-        self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-        self.wfile.write(b'{"success": true, "message": "Queued for Cloud Sync"}')
-
-        # 3. BACKGROUND CLOUD SYNC (Non-blocking)
-        def cloud_upload():
-            try:
-                supabase.table('resources').insert({
-                    "name": name, "type": rtype, "description": desc, "category": category,
-                    "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
-                }).execute()
-                print(f"STARS CLOUD: Successfully synced upload [{name}]")
-            except Exception as e:
-                print(f"STARS CLOUD ERROR: Upload sync failed: {e}")
-        
-        threading.Thread(target=cloud_upload, daemon=True).start()
+        try:
+            # 1. IMMEDIATE LOCAL SYNC
+            c.execute("INSERT INTO Resources (name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
+                      (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
+            conn.commit()
+            
+            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative)
+            supabase.table('resources').insert({
+                "name": name, "type": rtype, "description": desc, "category": category,
+                "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
+            }).execute()
+            
+            conn.close()
+            print(f"STARS AUTHORITY: Resource [{name}] uploaded and synced by {user['email']}.")
+            self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
+            self.wfile.write(b'{"success": true, "message": "Resource uploaded and synced"}')
+        except Exception as e:
+            print(f"STARS RESOURCE UPLOAD ERROR: {e}")
+            try: conn.close()
+            except: pass
+            self.send_error_json(500, f"Cloud Sync Failed: {str(e)}")
 
     def send_error_json(self, code, message):
         self.send_response(code)
@@ -1303,16 +1300,15 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         if not user:
             self.send_error_json(401, "Unauthorized"); return
             
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(content_length).decode())
-            res_id = str(data.get('id')) # Cast to string for safety
+            res_id = str(data.get('id')) 
             
             if not res_id:
-                self.send_error_json(400, "Missing ID"); return
-            
-            conn = sqlite3.connect(DATABASE)
-            c = conn.cursor()
+                conn.close(); self.send_error_json(400, "Missing ID"); return
             
             # Authorization Check: Must be owner OR ProgramStaff / Counselor
             c.execute("SELECT uploaded_by FROM Resources WHERE id=?", (res_id,))
@@ -1325,32 +1321,24 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             if not is_admin and user['email'].lower() != owner.lower():
                 conn.close(); self.send_error_json(403, f"Access Denied: You are not the owner ({owner})"); return
                 
-            # 1. IMMEDIATE LOCAL WIPE
+            # 1. SYNCHRONOUS CLOUD DELETE (Authoritative)
+            if not res_id.startswith('core-'):
+                supabase.table('resources').delete().eq('id', res_id).execute()
+                print(f"STARS CLOUD: Successfully synced deletion [{res_id}]")
+            
+            # 2. LOCAL WIPE
             c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
             conn.commit()
             conn.close()
             
-            # 2. INSTANT RESPONSE TO UNBLOCK FRONTEND
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
-            self.wfile.write(b'{"success": true, "message": "Deletion processed locally"}')
-
-            # 3. BACKGROUND CLOUD DELETE (Non-blocking)
-            def cloud_delete_worker():
-                try:
-                    # Attempt delete by ID (UUID) or Name if ID is manifest-based
-                    if res_id.startswith('core-'):
-                        print(f"STARS CLOUD: Core Resource [{res_id}] discarded locally.")
-                    else:
-                        supabase.table('resources').delete().eq('id', res_id).execute()
-                        print(f"STARS CLOUD: Successfully synced deletion [{res_id}]")
-                except Exception as e:
-                    print(f"STARS CLOUD ERROR: Deletion sync failed: {e}")
-            
-            threading.Thread(target=cloud_delete_worker, daemon=True).start()
-            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']} (Cloud Task Backgrounded).")
+            self.wfile.write(b'{"success": true, "message": "Deletion complete"}')
+            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']}.")
             return
         except Exception as e:
             print(f"RESOURCE DELETE ERROR: {e}")
+            try: conn.close()
+            except: pass
             self.send_error_json(500, str(e))
 
     def handle_get_messages(self, pair_id):
