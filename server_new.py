@@ -674,56 +674,64 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             return super().do_GET()
 
     def do_POST(self):
-        content_length = int(self.headers.get('Content-Length', 0))
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8')) if post_data else {}
-        
-        # BRUTE FORCE: Security Gate Removed for Emergency Override
-        # If you see this, the 403 Forbidden error is now impossible.
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            
+            # Universal JSON Parse with fallback
+            data = {}
+            if post_data:
+                try:
+                    data = json.loads(post_data.decode('utf-8'))
+                except:
+                    pass
+            
+            print(f"STARS API POST: {self.path}")
+            
+            # Authoritative Routing
+            if self.path == '/api/login' or self.path == '/api/verify_password':
+                self.handle_login(data)
+            elif self.path == '/api/visitor':
+                self.handle_visitor(data)
+            elif self.path == '/api/visitor/verify':
+                self.handle_visitor_verify(data)
+            elif self.path == '/api/register':
+                self.handle_register(data)
+            elif self.path == '/api/reset_password' or self.path == '/api/reset-password':
+                self.handle_reset_password(data)
+            elif self.path == '/api/resources/upload':
+                self.handle_upload_resource(data)
+            elif self.path == '/api/resources/delete':
+                self.handle_delete_resource()
+            elif self.path == '/api/messages':
+                self.handle_send_message(data)
+            elif self.path.startswith('/api/sessions/schedule'):
+                self.handle_schedule(data)
+            elif self.path.startswith('/api/survey/'):
+                self.handle_survey_routing(self.path, data)
+            elif self.path.startswith('/api/admin/'):
+                self.handle_admin_routing(self.path, data)
+            else:
+                self.send_error_json(404, f"Endpoint not found: {self.path}")
+        except Exception as e:
+            import traceback
+            print("!!! STARS API CRITICAL CRASH (POST) !!!")
+            traceback.print_exc()
+            self.send_error_json(500, f"Critical Server error: {str(e)}")
 
-        print(f"POST Request: {self.path}")
-        if self.path == '/api/register':
-            self.handle_register(data)
-        elif self.path == '/api/login' or self.path == '/api/verify_password' or self.path == '/api/verify-password':
-            self.handle_login(data)
-        elif self.path == '/api/visitor':
-            self.handle_visitor(data)
-        elif self.path == '/api/visitor/verify':
-            self.handle_visitor_verify(data)
-        elif self.path == '/api/reset_password':
-            self.handle_reset_password(data)
-        elif self.path.startswith('/api/sessions/schedule'):
-            self.handle_schedule(data)
-        elif self.path.startswith('/api/admin/delete') or self.path.startswith('/api/delete-user'):
-            self.handle_admin_delete(data)
-        elif self.path == '/api/survey/delete' or self.path.startswith('/api/survey/delete'):
-            self.handle_delete_survey(data)
-        elif self.path.startswith('/api/admin/create'):
-            self.handle_admin_create(data)
-        elif self.path == '/api/survey/ingest':
-            self.handle_survey_ingest(data)
-        elif self.path.startswith('/api/admin/update_profile'):
-            self.handle_admin_update_profile(data)
-        elif self.path.startswith('/api/admin/pair'):
-            self.handle_admin_pair(data)
-        elif self.path.startswith('/api/admin/data'):
-            self.handle_admin_data()
-        elif self.path.startswith('/api/survey/submit'):
-            self.handle_survey_submit(data)
-        elif self.path.startswith('/api/verify-staff') or self.path.startswith('/api/verify_staff'):
-            self.handle_verify_staff(data)
-        elif self.path.startswith('/api/verify_name'):
-            # Feature disabled as per user request
-            self.send_response(404); self.end_headers()
-        elif self.path.startswith('/api/resources/delete'):
-             self.handle_delete_resource(); return
-        elif self.path.startswith('/api/resources/upload'):
-            self.handle_upload_resource(data)
-        elif self.path.startswith('/api/messages'):
-            self.handle_send_message(data)
-        else:
-            print(f"Unknown POST path: {self.path}")
-            self.send_error(404)
+    def handle_survey_routing(self, path, data):
+        if 'submit' in path: self.handle_survey_submit(data)
+        elif 'delete' in path: self.handle_delete_survey(data)
+        elif 'ingest' in path: self.handle_survey_ingest(data)
+        else: self.send_error_json(404, "Survey endpoint not found")
+
+    def handle_admin_routing(self, path, data):
+        if 'create' in path: self.handle_admin_create(data)
+        elif 'pair' in path: self.handle_admin_pair(data)
+        elif 'delete' in path: self.handle_admin_delete(data)
+        elif 'update_profile' in path: self.handle_admin_update_profile(data)
+        elif 'data' in path: self.handle_admin_data()
+        else: self.send_error_json(404, "Admin endpoint not found")
 
     def handle_admin_create(self, data):
         conn = sqlite3.connect(DATABASE)

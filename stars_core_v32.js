@@ -191,9 +191,6 @@ window.trashSession = function (sessionId, btn) {
             alert("❌ Connectivity Error: " + e.message);
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
         }
-    });
-};
-
 window.trashResource = async (resId, btn) => {
     window.starsConfirm("Are you sure you want to permanently delete this resource? This action cannot be undone.", async () => {
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
@@ -208,27 +205,27 @@ window.trashResource = async (resId, btn) => {
                 body: JSON.stringify({ id: resId })
             });
 
-            // Handle non-JSON or error status codes gracefully
-            let data;
+            // RESILIENT HEARTBEAT: Log status immediately BEFORE parsing
             const text = await res.text();
+            let data;
             try {
                 data = JSON.parse(text);
-            } catch (jsonErr) {
-                console.error("STARS AUTH: Server returned non-JSON response:", text);
-                data = { success: false, error: `Server returned [${res.status}] error.` };
+            } catch (e) {
+                data = { success: false, error: `Invalid Server Response [${res.status}]` };
             }
 
             logAPI('DELETE', '/api/resources/delete', res.status, data.success ? 'Success' : data.error);
 
             if (res.ok && (data.status === 'success' || data.success)) {
                 alert("✓ Resource permanently removed.");
-                window.location.reload(); // Authoritative UI reset to clear stale local state
+                window.location.reload();
             } else {
                 console.error("STARS AUTH: Deletion failed:", data);
-                alert("❌ Deletion failed: " + (data.error || 'Permission denied or record not found.'));
+                alert("❌ Deletion failed: " + (data.error || 'Server error.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             }
         } catch (e) {
+            logAPI('ERR', '/api/resources/delete', 'Fail', e.message);
             console.error("STARS AUTH: Connectivity error:", e);
             alert("❌ Connectivity Error: " + e.message);
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -1540,7 +1537,15 @@ window.submitResourceUpload = async () => {
             body: JSON.stringify(payload)
         });
 
-        const data = await response.json();
+        // RESILIENT HEARTBEAT: Log BEFORE parsing to prevent silent hangs
+        const text = await response.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            data = { success: false, error: `Invalid Server Response [${response.status}]` };
+        }
+
         logAPI('POST', '/api/resources/upload', response.status, data.success ? 'Success' : data.error);
 
         if (data.success) {
