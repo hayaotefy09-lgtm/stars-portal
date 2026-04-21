@@ -218,6 +218,8 @@ window.trashResource = async (resId, btn) => {
                 data = { success: false, error: `Server returned [${res.status}] error.` };
             }
 
+            logAPI('DELETE', '/api/resources/delete', res.status, data.success ? 'Success' : data.error);
+
             if (res.ok && (data.status === 'success' || data.success)) {
                 alert("✓ Resource permanently removed.");
                 window.location.reload(); // Authoritative UI reset to clear stale local state
@@ -1452,6 +1454,45 @@ window.triggerSurveyAlert = function (title, msg, link) {
     document.body.appendChild(modal);
 };
 
+// 9. DIAGNOSTIC INFRASTRUCTURE (API Heartbeat Monitor)
+window.logAPI = (method, endpoint, status, message) => {
+    const overlay = document.getElementById('stars-api-diagnostic');
+    if (!overlay) return;
+    
+    const entry = document.createElement('div');
+    const color = status === 200 || status === 'success' ? '#10b981' : '#ef4444';
+    entry.style = `padding: 0.5rem; margin-top: 0.5rem; border-left: 3px solid ${color}; background: #f8fafc; border-radius: 6px; font-family: monospace; font-size: 10px; color: #1e293b;`;
+    entry.innerHTML = `
+        <div style="font-weight: 800; display: flex; justify-content: space-between;">
+            <span>${method} ${endpoint}</span>
+            <span style="color: ${color}">${status}</span>
+        </div>
+        <div style="opacity: 0.7;">${message || ''}</div>
+    `;
+    overlay.prepend(entry);
+    if (overlay.children.length > 5) overlay.lastChild.remove();
+};
+
+window.initDiagnosticOverlay = () => {
+    if (document.getElementById('stars-api-diagnostic')) return;
+    const diag = document.createElement('div');
+    diag.id = 'stars-api-diagnostic';
+    diag.style = "position:fixed; bottom:20px; right:20px; width:220px; max-height:300px; background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border:1px solid #e2e8f0; border-radius:12px; z-index:999999; padding:0.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); display:flex; flex-direction:column; overflow:hidden;";
+    diag.innerHTML = `<div style="font-size:10px; font-weight:800; color:#94a3b8; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em; display:flex; justify-content:space-between; align-items:center;">
+        API Heartbeat
+        <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
+    </div>`;
+    document.body.appendChild(diag);
+    logAPI('BOOT', 'System Online', 200, 'v4.5 Non-Blocking Ready');
+};
+
+// Initialize Diagnostics and restore handlers
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.location.hash.includes('#staff') || window.location.hash.includes('#portal')) {
+        setTimeout(initDiagnosticOverlay, 1000);
+    }
+});
+
 window.handleFileSelect = (input) => {
     const file = input.files[0];
     const display = document.getElementById('selected-filename');
@@ -1485,7 +1526,6 @@ window.submitResourceUpload = async () => {
             url: '#'
         };
 
-        // If it's a URL-based upload from the same modal
         const urlInput = document.getElementById('res-upload-url');
         if (urlInput && urlInput.value) {
             payload.url = urlInput.value;
@@ -1501,6 +1541,8 @@ window.submitResourceUpload = async () => {
         });
 
         const data = await response.json();
+        logAPI('POST', '/api/resources/upload', response.status, data.success ? 'Success' : data.error);
+
         if (data.success) {
             alert("✓ Resource posted successfully!");
             window.location.reload();
@@ -1508,6 +1550,7 @@ window.submitResourceUpload = async () => {
             alert("❌ Upload failed: " + (data.error || "Server error"));
         }
     } catch (e) {
+        logAPI('ERR', '/api/resources/upload', 'Fail', e.message);
         alert("❌ Connectivity Error: " + e.message);
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = 'Post to Library'; }

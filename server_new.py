@@ -11,6 +11,7 @@ from urllib.parse import urlparse, parse_qs
 from supabase import create_client, Client
 import openpyxl
 import os
+import threading
 
 print('Resend Integration (Requests) Ready')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
@@ -216,9 +217,13 @@ CORE_RESOURCES = [
 ]
 
 def sync_from_supabase():
-    """Authoritative Pull of Cloud Registry into Local Session Engine"""
+    """Non-blocking sync trigger for high-responsiveness"""
+    threading.Thread(target=sync_from_supabase_worker, daemon=True).start()
+
+def sync_from_supabase_worker():
+    """Authoritative Pull of Cloud Registry (Executed in Background)"""
     try:
-        # --- INFRASTRUCTURE UPGRADE: Ensure TEXT IDs for UUID compatibility ---
+        # --- BOOTSTRAP CORE MANIFEST ---
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
         c.execute("PRAGMA table_info(Resources)")
@@ -238,12 +243,8 @@ def sync_from_supabase():
                     description TEXT,
                     category TEXT,
                     url TEXT
-                )
-            """)
-            conn.commit()
-            print("STARS AUTHORITY: Migration Successful.")
-        conn.close()
-
+        # Note: force_database_reset() is called at server startup now.
+        
         # --- BOOTSTRAP CORE MANIFEST ---
         # Ensures critical records always have stable IDs and valid structure
         conn = sqlite3.connect(DATABASE)
@@ -267,33 +268,20 @@ def sync_from_supabase():
         if res.data:
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
-            for p in res.data:
-                email = p.get('email', '').lower().strip()
-                if not email: continue
+            for r in res.data:
                 c.execute("""
-                    INSERT INTO Users (email, first_name, last_name, role, isCounselor, title, bio, interests)
+                    INSERT INTO Users (email, first_name, last_name, bio, interests, title, role, password)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(email) DO UPDATE SET
                         first_name=excluded.first_name,
                         last_name=excluded.last_name,
-                        role=excluded.role,
-                        isCounselor=excluded.isCounselor,
-                        title=excluded.title,
                         bio=excluded.bio,
-                        interests=excluded.interests
-                """, (
-                    email,
-                    p.get('first_name', ''),
-                    p.get('last_name', ''),
-                    p.get('role', 'Mentee'),
-                    1 if p.get('role') == 'ProgramStaff' or email in [e.lower() for e in PROTECTED_EMAILS] else 0,
-                    p.get('title', ''),
-                    p.get('bio', ''),
-                    p.get('interests', '')
-                ))
+                        interests=excluded.interests,
+                        title=excluded.title,
+                        role=excluded.role
+                """, (r['email'], r.get('first_name'), r.get('last_name'), r.get('bio'), r.get('interests'), r.get('title'), r.get('role', 'Mentee'), 'pass123'))
             conn.commit()
             conn.close()
-            print(f"STARS AUTHORITY: Sync successful. {len(res.data)} profiles updated.")
 
         # --- RESOURCE SYNC ---
         print("STARS AUTHORITY: Synchronizing Library (Resources)...")
@@ -302,57 +290,27 @@ def sync_from_supabase():
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
             for r in res_r.data:
-                # DEBUG: Log keys of the first resource to solve the 'Link Unavailable' mystery
-                if res_r.data.index(r) == 0:
-                    print(f"STARS DEBUG: Resource Keys found: {list(r.keys())}")
-                    print(f"STARS DEBUG: Resource Data Sample: {r}")
-
                 # Exhaustive Metadata Recovery (handles all possible cloud schema variations)
-                # We check for lower, Pascal, and UPPER cases for each key
                 name = r.get('name') or r.get('Name') or r.get('NAME') or r.get('title') or r.get('Title') or 'Resource'
-                
-                # DUPLICATION FILTER: Skip if this record matches a CORE resource name
-                if name in core_names:
-                    continue
+                if name in core_names: continue
 
                 rtype = r.get('type') or r.get('Type') or r.get('file_type') or 'PDF'
                 desc = r.get('description') or r.get('Description') or r.get('desc') or r.get('summary') or r.get('Summary') or ''
                 cat = r.get('category') or r.get('Category') or r.get('cat') or 'General'
                 
-                # Check ALL common URL keys (Comprehensive mapping)
                 url = (r.get('url') or r.get('Url') or r.get('URL') or 
                        r.get('file_url') or r.get('fileUrl') or r.get('fileURL') or
                        r.get('link') or r.get('Link') or r.get('LINK') or
                        r.get('path') or r.get('Path') or r.get('path_url') or '')
 
-                # DEBUG LOG FOR DISCOVERY (Only for the first item to keep logs readable)
-                if res_r.data.index(r) == 0:
-                    print(f"STARS AUTHORITY DEBUG: Found Resource [{name}]. Keys: {list(r.keys())}")
-                    print(f"STARS AUTHORITY DEBUG: Values Sample: desc[{desc[:20]}...] url[{url[:20]}...]")
-
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
-                        name=excluded.name,
-                        type=excluded.type,
-                        size=excluded.size,
-                        uploaded_by=excluded.uploaded_by,
-                        timestamp=excluded.timestamp,
-                        description=excluded.description,
-                        category=excluded.category,
-                        url=excluded.url
-                """, (
-                    str(r.get('id')), # Ensure ID is treated as string for UUID compatibility
-                    name,
-                    rtype,
-                    r.get('size', '0.5 MB'),
-                    r.get('uploaded_by', ''),
-                    r.get('timestamp', ''),
-                    desc,
-                    cat,
-                    url
-                ))
+                        name=excluded.name, type=excluded.type, size=excluded.size,
+                        uploaded_by=excluded.uploaded_by, timestamp=excluded.timestamp,
+                        description=excluded.description, category=excluded.category, url=excluded.url
+                """, (str(r.get('id')), name, rtype, r.get('size', '0.5 MB'), r.get('uploaded_by',''), r.get('timestamp',''), desc, cat, url))
             conn.commit()
             conn.close()
             print(f"STARS AUTHORITY: Resource sync successful. {len(res_r.data)} items updated.")
@@ -1305,28 +1263,28 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         c = conn.cursor()
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Sync Local
+        # 1. IMMEDIATE LOCAL SYNC
         c.execute("INSERT INTO Resources (name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
                   (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
         conn.commit()
         conn.close()
 
-        # Sync Supabase Table (Authoritative Library)
-        try:
-            supabase.table('resources').insert({
-                "name": name,
-                "type": rtype,
-                "description": desc,
-                "category": category,
-                "url": file_url,
-                "uploaded_by": user['email'],
-                "timestamp": timestamp
-            }).execute()
-        except:
-            pass
-
+        # 2. INSTANT RESPONSE TO UNBLOCK FRONTEND
         self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-        self.wfile.write(b'{"success": true}')
+        self.wfile.write(b'{"success": true, "message": "Queued for Cloud Sync"}')
+
+        # 3. BACKGROUND CLOUD SYNC (Non-blocking)
+        def cloud_upload():
+            try:
+                supabase.table('resources').insert({
+                    "name": name, "type": rtype, "description": desc, "category": category,
+                    "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
+                }).execute()
+                print(f"STARS CLOUD: Successfully synced upload [{name}]")
+            except Exception as e:
+                print(f"STARS CLOUD ERROR: Upload sync failed: {e}")
+        
+        threading.Thread(target=cloud_upload, daemon=True).start()
 
     def send_error_json(self, code, message):
         self.send_response(code)
@@ -1361,20 +1319,30 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             if not is_admin and user['email'].lower() != owner.lower():
                 conn.close(); self.send_error_json(403, f"Access Denied: You are not the owner ({owner})"); return
                 
-            # Authoritative Wipe
+            # 1. IMMEDIATE LOCAL WIPE
             c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
             conn.commit()
             conn.close()
             
-            # Cloud Wipe
-            try:
-                supabase.table('resources').delete().eq('id', res_id).execute()
-            except Exception as cloud_e:
-                print(f"CLOUD DELETE WARNING: {cloud_e}")
+            # 2. INSTANT RESPONSE TO UNBLOCK FRONTEND
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
+            self.wfile.write(b'{"success": true, "message": "Deletion processed locally"}')
+
+            # 3. BACKGROUND CLOUD DELETE (Non-blocking)
+            def cloud_delete_worker():
+                try:
+                    # Attempt delete by ID (UUID) or Name if ID is manifest-based
+                    if res_id.startswith('core-'):
+                        print(f"STARS CLOUD: Core Resource [{res_id}] discarded locally.")
+                    else:
+                        supabase.table('resources').delete().eq('id', res_id).execute()
+                        print(f"STARS CLOUD: Successfully synced deletion [{res_id}]")
+                except Exception as e:
+                    print(f"STARS CLOUD ERROR: Deletion sync failed: {e}")
             
-            self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-            self.wfile.write(b'{"success": true}')
-            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']}.")
+            threading.Thread(target=cloud_delete_worker, daemon=True).start()
+            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']} (Cloud Task Backgrounded).")
+            return
         except Exception as e:
             print(f"RESOURCE DELETE ERROR: {e}")
             self.send_error_json(500, str(e))
