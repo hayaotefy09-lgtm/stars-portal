@@ -1896,16 +1896,20 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             conn.close()
 
 
-# Execute Authoritative Reset & Sync
-try:
-    force_database_reset()
-except Exception as e:
-    print(f"RESET WARNING: {e}")
-
+# Execute Boot Sequence
 if __name__ == "__main__":
+    print(">>> STARS BOOT: Initializing Database...")
     init_db()
-    socketserver.TCPServer.allow_reuse_address = True
-    # Listen on 0.0.0.0 and use the dynamic PORT for Render
-    with socketserver.TCPServer(("0.0.0.0", PORT), STARSAPIHandler) as httpd:
-        print(f"STARS Portal Live: Listening on host 0.0.0.0, port {PORT}")
-        httpd.serve_forever()
+    
+    print(">>> STARS BOOT: Executing Authoritative Reset & Sync...")
+    try:
+        force_database_reset()
+        print(">>> STARS BOOT: Sync Complete.")
+    except Exception as e:
+        print(f">>> STARS BOOT WARNING: Reset failed: {e}")
+
+    print(f">>> STARS BOOT: Starting HTTPServer on port {PORT}...")
+    server_address = ('', PORT)
+    httpd = http.server.HTTPServer(server_address, STARSAPIHandler)
+    print(f"STARS Portal Live: Listening on port {PORT}")
+    httpd.serve_forever()
