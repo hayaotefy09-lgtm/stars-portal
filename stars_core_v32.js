@@ -329,8 +329,40 @@ window.handleOTP = function (el, idx) {
 
 // 4. Dash Init
 async function initDashboard() {
+    log("Initializing Dashboard Logic...");
     try {
+        const session = StarsSession.get();
+        if (!session) {
+            showAuthForm('menu');
+            return;
+        }
+        const { token, user } = session;
+
+        // Correct Sidebar Selector (#dynamic-sidebar)
+        const sidebar = document.getElementById('dynamic-sidebar');
+        if (!sidebar) {
+            console.error("Dashboard sidebar container not found.");
+            dismissLoader();
+            return;
+        }
+
+        // Apply Counselor Theme
+        const isCounselor = !!user.is_counselor || !!user.isCounselor || user.role === 'ProgramStaff';
+        document.body.classList.toggle('counselor-theme', isCounselor);
+
+        // Fetch Live Dashboard Data
+        const res = await fetch('/api/dashboard', { 
+            headers: { 'Authorization': `Bearer ${token}` } 
+        });
+        if (!res.ok) throw new Error("Database synchronization failed.");
+        
+        const data = await res.json();
+        window.DASH_DATA = data; // Authoritative state
+        log("Portal Data Synced.");
+
+        // Populate Sidebar
         const items = [
+            { id: 'dashboard', label: 'Dashboard' },
             { id: 'messages', label: 'Messages', hideForStaffOnly: true, hideForMentors: true },
             { id: 'survey', label: 'Survey Center', hideForMentees: true, hideForMentors: true },
             { id: 'sessions', label: 'My Sessions', hideForStaffOnly: true, hideForVisitors: true },
@@ -340,37 +372,30 @@ async function initDashboard() {
             { id: 'settings', label: 'Settings' }
         ];
 
-        const sidebar = document.querySelector('.sidebar-nav');
-        if (!sidebar) return;
-
-        const isStaffOnly = !!StarsSession.get()?.user?.isStaff;
-        const isCounselor = !!StarsSession.get()?.user?.isCounselor;
-        const user = StarsSession.get()?.user;
-
         sidebar.innerHTML = items.map(item => {
             if (item.hideForMentees && user.role === 'Mentee') return '';
-            if (item.hideForStaffOnly && isStaffOnly) return '';
+            if (item.hideForStaffOnly && user.role === 'ProgramStaff' && !isCounselor) return '';
             if (item.hideForVisitors && user.role === 'Visitor') return '';
             return `<li class="sidebar-btn" onclick="window.showPage('${item.id}', this)" data-page="${item.id}">${item.label}</li>`;
         }).join('');
 
-        // Management Console for Staff/Counselors
         if (user.role === 'Program Manager' || user.role === 'Counselor' || isCounselor) {
             sidebar.innerHTML += `<li class="sidebar-btn" onclick="window.location.href='/admin.html'" style="color:#e84393; font-weight:800; background:#fff1f6;">Management Console</li>`;
         }
 
+        // Trigger UI Renders
         window.showPage('dashboard');
 
-        // Populate Profile details
-        if (document.getElementById('prof-fname')) {
-            document.getElementById('prof-fname').textContent = user.full_name?.split(' ')[0] || 'User';
-            document.getElementById('prof-lname').textContent = user.full_name?.split(' ')[1] || '';
-            document.getElementById('prof-email').textContent = user.email;
-        }
+        // Profile Sync
+        const profName = document.getElementById('profile-name');
+        if (profName) profName.textContent = user.full_name || user.name || 'User';
+        
+        const profInitial = document.getElementById('profile-initial');
+        if (profInitial) profInitial.textContent = (user.full_name || user.name || 'U').charAt(0).toUpperCase();
 
         dismissLoader();
     } catch (e) {
-        console.log(`Dash error: ${e.message}`);
+        log(`Dash error: ${e.message}`);
         dismissLoader();
     }
 }
