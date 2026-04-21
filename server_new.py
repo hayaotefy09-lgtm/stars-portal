@@ -25,6 +25,7 @@ RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_Y3YvChqy_8umddUdmRLsbs5ozo
 
 OTP_STORE = {}
 SESSION_STORE = {}
+DELETED_RESOURCES_BLOCKLIST = set()
 
 PROTECTED_EMAILS = [
     'joshua.q@naischool.ae', 
@@ -306,6 +307,11 @@ def sync_from_supabase_worker():
                 final_url = url if url else (existing[0] if existing else '')
                 final_desc = desc if desc else (existing[1] if existing else '')
                 final_cat = cat if cat else (existing[2] if existing else 'General')
+
+                # 3. ANTI-GHOSTING PROTECTION: Skip if recently deleted in this session
+                if str(r.get('id')) in DELETED_RESOURCES_BLOCKLIST:
+                    print(f"STARS SYNC: Skipping ghost resource {r.get('id')}")
+                    continue
 
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
@@ -1223,51 +1229,48 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
     def handle_upload_resource(self, data):
         user = get_user_from_headers(self.headers)
         if not user or (user['role'] != 'Mentor' and not user.get('isCounselor')):
-            self.send_response(403); self.end_headers(); return
+            self.send_error_json(403, "Access Denied"); return
             
         name = data.get('name')
         rtype = data.get('type', 'PDF')
         desc = data.get('description', '')
         category = data.get('category', 'Resilience')
-        file_url = data.get('url', '') # Direct Supabase URL
-        
-        if not name:
-            self.send_response(400); self.end_headers(); return
-            
-        # GENERATE STABLE INTEGER ID (Unix Micro-Timestamp)
-        # Higher compatibility with SQL INTEGER primary key while maintaining uniqueness
-        stable_id = int(datetime.datetime.now().timestamp() * 1000)
-        
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
+        file_url = data.get('url', '')
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        try:
-            # 1. IMMEDIATE LOCAL SYNC (Using Stable ID)
-            c.execute("INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
-                      (stable_id, name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
-            conn.commit()
+
+        if not name:
+            self.send_error_json(400, "Missing Name"); return
             
-            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative Stable ID)
+        try:
+            # 1. CLOUD-FIRST INSERT: Let the cloud decide the ID
             raw_payload = {
-                "id": stable_id, "name": name, "type": rtype, "description": desc, "category": category,
+                "name": name, "type": rtype, "description": desc, "category": category,
                 "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp, "size": "0.5 MB"
             }
-            safe_payload = {k: v for k, v in raw_payload.items() if k in CLOUD_RESOURCE_COLUMNS}
+            safe_payload = {k: v for k, v in raw_payload.items() if k in CLOUD_RESOURCE_COLUMNS and k != 'id'}
             
-            try:
-                supabase.table('resources').insert(safe_payload).execute()
-                print(f"STARS CLOUD: Resource [{stable_id}] synced successfully.")
-            except Exception as cloud_err:
-                print(f"STARS AUTHORITY WARNING: Cloud sync failure, but local saved: {cloud_err}")
+            print(f"STARS AUTHORITY: Performing Cloud-First Insert for [{name}]...")
+            cloud_res = supabase.table('resources').insert(safe_payload).execute()
             
-            conn.close()
-            self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-            self.wfile.write(json.dumps({"success": true, "id": stable_id}).encode())
+            if not cloud_res.data:
+                raise Exception("Cloud insert failed to return data")
+                
+            authoritative_id = cloud_res.data[0]['id']
+            print(f"STARS AUTHORITY: Cloud assigned ID [{authoritative_id}]")
+            
+            # 2. LOCAL SYNC: Using the Authoritative ID
+            conn = sqlite3.connect(DATABASE); c = conn.cursor()
+            c.execute("INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                      (authoritative_id, name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
+            conn.commit(); conn.close()
+            
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps({"success": True, "id": authoritative_id}).encode())
         except Exception as e:
-            print(f"STARS RESOURCE UPLOAD ERROR: {e}")
-            try: conn.close()
-            except: pass
-            self.send_error_json(500, f"Cloud Sync Failed: {str(e)}")
+            print(f"CLOUD-FIRST UPLOAD ERROR: {e}")
+            self.send_error_json(500, f"Restoration Failure: {str(e)}")
 
     def send_error_json(self, code, message):
         self.send_response(code)
@@ -1302,18 +1305,18 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                 
             # 1. SYNCHRONOUS CLOUD DELETE (Authoritative) with Type Resilience
             if not res_id.startswith('core-'):
-                # Try as Int first, then as String to ensure persistence
+                DELETED_RESOURCES_BLOCKLIST.add(res_id)
+                try: 
+                    DELETED_RESOURCES_BLOCKLIST.add(str(int(res_id)))
+                except: pass
+                
                 try: 
                     res_id_int = int(res_id)
                     supabase.table('resources').delete().eq('id', res_id_int).execute()
-                    print(f"STARS CLOUD: Successfully synced deletion as INT [{res_id_int}]")
                 except Exception as e_int:
-                    print(f"STARS CLOUD: Int delete failed/not needed ({e_int}), trying STR...")
                     supabase.table('resources').delete().eq('id', res_id).execute()
-                    print(f"STARS CLOUD: Successfully synced deletion as STR [{res_id}]")
             
             # 2. LOCAL WIPE (Dual-Type Resilience)
-            # Try as integer first, then as string to ensure no ghosting
             try:
                 c.execute("DELETE FROM Resources WHERE id=?", (int(res_id),))
             except:
@@ -1324,7 +1327,6 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             
             self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
             self.wfile.write(b'{"success": true, "message": "Deletion complete"}')
-            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']}.")
             return
         except Exception as e:
             print(f"RESOURCE DELETE ERROR: {e}")
