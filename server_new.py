@@ -559,24 +559,69 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             user = get_user_from_headers(self.headers)
             if not user:
                 self.send_response(401); self.end_headers(); return
+            
             sync_from_supabase()
             email, role = user.get('email'), user.get('role')
+            is_counselor = user.get('isCounselor', False)
+            
             conn = sqlite3.connect(DATABASE); c = conn.cursor()
             res = {"pairs": [], "mentors": [], "sessions": [], "messages": [], "resources": [], "surveys": []}
+            
+            # 1. GLOBAL REGISTRY (Triple Tala Compatible)
             c.execute("SELECT u.first_name, u.last_name, u.email, u.bio, u.interests, u.title, u.role, (SELECT COUNT(*) FROM MentorMenteePair p WHERE p.mentor_email = u.email) as pair_count FROM Users u")
-            res["mentors"] = [{"name": f"{r[0]} {r[1]}", "email": r[2], "bio": r[3] or '', "interests": r[4] or '', "title": r[5] or 'STARS MENTOR', "role": r[6], "is_paired": r[7] > 0} for r in c.fetchall() if r[6] == 'Mentor']
+            all_users_raw = c.fetchall()
+            res["mentors"] = [{"name": f"{r[0]} {r[1]}", "email": r[2], "bio": r[3] or '', "interests": r[4] or '', "title": r[5] or 'STARS MENTOR', "role": r[6], "is_paired": r[7] > 0} for r in all_users_raw if r[6] == 'Mentor']
+
+            # 2. ROLE-SPECIFIC DATA DEEP DIVE
             if role == 'Mentor':
                 c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentee_email = u.email WHERE p.mentor_email=?", (email,))
-                for row in c.fetchall(): res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentee"})
+                for r in c.fetchall(): res["pairs"].append({"name": f"{r[0]} {r[1]}", "email": r[2], "pair_id": r[3], "type": "Mentee"})
+                
+                c.execute("""SELECT s.id, s.start_time, s.pair_id, u_mentee.first_name, u_mentee.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s 
+                             LEFT JOIN MentorMenteePair p ON s.pair_id = p.id 
+                             LEFT JOIN Users u_mentee ON p.mentee_email = u_mentee.email
+                             LEFT JOIN Users sch ON s.scheduled_by = sch.email
+                             WHERE p.mentor_email=?""", (email,))
+                all_sessions = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]}" if r[3] else "Orphaned Pair", "meeting_link": r[5], "status": r[6], "scheduled_by": r[7], "scheduler_name": f"{r[8]} {r[9]}" if r[8] else r[7], "scheduler_role": r[10], "participants": r[11]} for r in c.fetchall()]
+                res["sessions"] = [s for s in all_sessions if not s["participants"] or email.lower() in s["participants"].lower()]
+
             elif role == 'Mentee':
                 c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentor_email = u.email WHERE p.mentee_email=?", (email,))
-                for row in c.fetchall(): res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentor"})
+                for r in c.fetchall(): res["pairs"].append({"name": f"{r[0]} {r[1]}", "email": r[2], "pair_id": r[3], "type": "Mentor"})
+                
+                c.execute("""SELECT s.id, s.start_time, s.pair_id, u_mentor.first_name, u_mentor.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s 
+                             LEFT JOIN MentorMenteePair p ON s.pair_id = p.id 
+                             LEFT JOIN Users u_mentor ON p.mentor_email = u_mentor.email
+                             LEFT JOIN Users sch ON s.scheduled_by = sch.email
+                             WHERE p.mentee_email=?""", (email,))
+                all_sessions = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]}" if r[3] else "Orphaned Pair", "meeting_link": r[5], "status": r[6], "scheduled_by": r[7], "scheduler_name": f"{r[8]} {r[9]}" if r[8] else r[7], "scheduler_role": r[10], "participants": r[11]} for r in c.fetchall()]
+                res["sessions"] = [s for s in all_sessions if not s["participants"] or email.lower() in s["participants"].lower()]
+
+            elif is_counselor or role == 'ProgramStaff':
+                # Global Visibility for Administrators
+                c.execute("""SELECT m.first_name, m.last_name, s.first_name, s.last_name, p.id, m.email, s.email FROM MentorMenteePair p 
+                             JOIN Users m ON p.mentor_email = m.email
+                             JOIN Users s ON p.mentee_email = s.email""")
+                for r in c.fetchall(): res["pairs"].append({"mentor_name": f"{r[0]} {r[1]}", "mentee_name": f"{r[2]} {r[3]}", "mentor_email": r[5], "mentee_email": r[6], "name": f"{r[0]} {r[1]} <-> {r[2]} {r[3]}", "pair_id": r[4], "type": "Pair"})
+                
+                c.execute("""SELECT s.id, s.start_time, s.pair_id, m.first_name, m.last_name, me.first_name, me.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s
+                             LEFT JOIN MentorMenteePair p ON s.pair_id = p.id
+                             LEFT JOIN Users m ON p.mentor_email = m.email
+                             LEFT JOIN Users me ON p.mentee_email = me.email
+                             LEFT JOIN Users sch ON s.scheduled_by = sch.email""")
+                res["sessions"] = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": (f"{r[3]} {r[4]} <-> {r[5]} {r[6]}" if r[3] else "Orphaned Pair"), "meeting_link": r[7], "status": r[8], "scheduled_by": r[9], "scheduler_name": f"{r[10]} {r[11]}" if r[11] else r[9], "scheduler_role": r[12], "participants": r[13]} for r in c.fetchall()]
+
+            # 3. LIBRARY & RESOURCES
             c.execute("SELECT id, name, type, size, category, description, url FROM Resources")
             res["resources"] = [{"id": r[0], "name": r[1], "type": r[2], "size": r[3], "category": r[4], "description": r[5], "url": r[6]} for r in c.fetchall()]
+            
             conn.close()
             self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
             self.wfile.write(json.dumps(res).encode())
         except Exception as e:
+            import traceback
+            print(f"DASHBOARD ROUTING FAILURE: {e}")
+            traceback.print_exc()
             self.send_error_json(500, f"Dashboard Routing Error: {str(e)}")
 
     def handle_link_profile(self, email, uid):
