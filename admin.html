@@ -591,6 +591,7 @@
                 "Delete User?",
                 `Are you sure you want to permanently delete account ${email}?`,
                 async () => {
+                    try {
                         // Visual instant removal for snappy UI
                         const row = event.target.closest('tr');
                         if (row) row.style.opacity = '0.5';
