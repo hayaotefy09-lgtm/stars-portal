@@ -702,7 +702,7 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             elif raw_path == '/api/resources/upload':
                 self.handle_upload_resource(data)
             elif raw_path == '/api/resources/delete':
-                self.handle_delete_resource()
+                self.handle_delete_resource(data)
             elif raw_path == '/api/messages':
                 self.handle_send_message(data)
             elif raw_path == '/api/register':
@@ -1300,7 +1300,7 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps({"success": False, "error": message}).encode())
 
-    def handle_delete_resource(self):
+    def handle_delete_resource(self, data):
         user = get_user_from_headers(self.headers)
         if not user:
             self.send_error_json(401, "Unauthorized"); return
@@ -1308,8 +1308,6 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            data = json.loads(self.rfile.read(content_length).decode())
             res_id = str(data.get('id')) 
             
             if not res_id:

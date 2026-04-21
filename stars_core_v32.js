@@ -1477,7 +1477,7 @@ window.initDiagnosticOverlay = () => {
         <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
     </div>`;
     document.body.appendChild(diag);
-    logAPI('BOOT', 'System Online', 200, 'v4.5 Non-Blocking Ready');
+    logAPI('BOOT', 'System Online', 200, 'v5.0 Precision Ready');
 };
 
 // Initialize Diagnostics and restore handlers
