@@ -564,14 +564,12 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_reset_password(data)
         elif self.path.startswith('/api/sessions/schedule'):
             self.handle_schedule(data)
-        elif self.path.startswith('/api/sessions/delete'):
-            self.handle_delete_session(data)
-        elif self.path == '/api/survey/delete':
+        elif self.path.startswith('/api/admin/delete') or self.path == '/api/delete-user':
+            self.handle_admin_delete(data)
+        elif self.path == '/api/survey/delete' or self.path.startswith('/api/survey/delete'):
             self.handle_delete_survey(data)
         elif self.path.startswith('/api/admin/create'):
             self.handle_admin_create(data)
-        elif self.path.startswith('/api/admin/delete'):
-            self.handle_admin_delete(data)
         elif self.path == '/api/survey/ingest':
             self.handle_survey_ingest(data)
         elif self.path.startswith('/api/admin/update_profile'):
@@ -582,10 +580,6 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_admin_data()
         elif self.path.startswith('/api/survey/submit'):
             self.handle_survey_submit(data)
-        elif self.path.startswith('/api/survey/delete'):
-            self.handle_delete_survey(data)
-        elif self.path.startswith('/api/sessions/delete'):
-            self.handle_delete_session(data)
         elif self.path.startswith('/api/verify-staff') or self.path.startswith('/api/verify_staff'):
             self.handle_verify_staff(data)
         elif self.path.startswith('/api/verify_name'):
@@ -616,8 +610,9 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
         try:
              # 1. Sync to SQLite (Nuclear Override: Ignore name conflicts, only check email PK)
-             c.execute("INSERT OR REPLACE INTO Users (email, first_name, last_name, password, role) VALUES (?, ?, ?, ?, ?)", 
-                       (email, fn, ln, '', role))
+             is_counselor = 1 if role == 'ProgramStaff' else 0
+             c.execute("INSERT OR REPLACE INTO Users (email, first_name, last_name, password, role, isCounselor) VALUES (?, ?, ?, ?, ?, ?)", 
+                       (email, fn, ln, '', role, is_counselor))
              conn.commit()
              
              # 2. Sync to Supabase 'profiles' table
@@ -718,7 +713,15 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                     print(f"Auth Revocation (Non-Admin Key?) info: {auth_err}")
                     # Don't fail the whole request if Auth revocation fails (might be unauthenticated user)
             
-            # 3. Defensive cleanup (if not already handled by client)
+            # 3. Local SQLite Cleanup
+            conn = sqlite3.connect(DATABASE)
+            c = conn.cursor()
+            c.execute("DELETE FROM Users WHERE email = ?", (email,))
+            c.execute("DELETE FROM MentorMenteePair WHERE mentor_email = ? OR mentee_email = ?", (email, email))
+            conn.commit()
+            conn.close()
+
+            # 4. Defensive cleanup (if not already handled by client)
             if not data.get('profiles_already_deleted'):
                 supabase.table('profiles').delete().eq('email', email).execute()
                 supabase.table('mentor_mentee_pairs').delete().eq('mentor_email', email).execute()

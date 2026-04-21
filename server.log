@@ -71,3 +71,8 @@ POST Request: /api/visitor/verify
 127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /style.css?v=7.4 HTTP/1.1" 200 -
 127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /stars_core_v32.js?v=7.4 HTTP/1.1" 200 -
 127.0.0.1 - - [21/Apr/2026 00:17:58] "GET /assets/logo.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 01:29:39] "OPTIONS /api/admin/data HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 01:33:59] "OPTIONS /api/admin/data HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 01:33:59] "OPTIONS /api/admin/data HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 01:38:15] "OPTIONS /api/admin/data HTTP/1.1" 200 -
+127.0.0.1 - - [21/Apr/2026 01:38:16] "OPTIONS /api/admin/data HTTP/1.1" 200 -
