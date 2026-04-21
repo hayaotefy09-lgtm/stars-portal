@@ -675,6 +675,12 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            # 1. PATH NORMALIZATION: Strip queries and trailing slashes
+            raw_path = self.path.split('?')[0].rstrip('/')
+            if not raw_path: raw_path = '/'
+            
+            print(f">>> STARS API INCOMING: POST {raw_path} (Original: {self.path})")
+            
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             
@@ -686,37 +692,36 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                 except:
                     pass
             
-            print(f"STARS API POST: {self.path}")
-            
-            # Authoritative Routing
-            if self.path == '/api/login' or self.path == '/api/verify_password':
+            # Authoritative Routing with Normalized Path
+            if raw_path == '/api/login' or raw_path == '/api/verify_password':
                 self.handle_login(data)
-            elif self.path == '/api/visitor':
+            elif raw_path == '/api/visitor':
                 self.handle_visitor(data)
-            elif self.path == '/api/visitor/verify':
+            elif raw_path == '/api/visitor/verify':
                 self.handle_visitor_verify(data)
-            elif self.path == '/api/register':
-                self.handle_register(data)
-            elif self.path == '/api/reset_password' or self.path == '/api/reset-password':
-                self.handle_reset_password(data)
-            elif self.path == '/api/resources/upload':
+            elif raw_path == '/api/resources/upload':
                 self.handle_upload_resource(data)
-            elif self.path == '/api/resources/delete':
+            elif raw_path == '/api/resources/delete':
                 self.handle_delete_resource()
-            elif self.path == '/api/messages':
+            elif raw_path == '/api/messages':
                 self.handle_send_message(data)
-            elif self.path.startswith('/api/sessions/schedule'):
+            elif raw_path == '/api/register':
+                self.handle_register(data)
+            elif raw_path == '/api/reset_password' or raw_path == '/api/reset-password':
+                self.handle_reset_password(data)
+            elif raw_path == '/api/sessions/schedule':
                 self.handle_schedule(data)
-            elif self.path.startswith('/api/survey/'):
-                self.handle_survey_routing(self.path, data)
-            elif self.path.startswith('/api/verify-staff') or self.path.startswith('/api/verify_staff'):
+            elif raw_path.startswith('/api/survey'):
+                self.handle_survey_routing(raw_path, data)
+            elif raw_path.startswith('/api/verify-staff') or raw_path.startswith('/api/verify_staff'):
                 self.handle_verify_staff(data)
-            elif self.path.startswith('/api/verify_name'):
+            elif raw_path.startswith('/api/verify_name'):
                 self.handle_verify_staff_name(data)
-            elif self.path.startswith('/api/admin/'):
-                self.handle_admin_routing(self.path, data)
+            elif raw_path.startswith('/api/admin'):
+                self.handle_admin_routing(raw_path, data)
             else:
-                self.send_error_json(404, f"Endpoint not found: {self.path}")
+                print(f"!!! STARS ROUTING FAILURE: No match for POST {raw_path}")
+                self.send_error_json(404, f"Endpoint not found: {raw_path}")
         except Exception as e:
             import traceback
             print("!!! STARS API CRITICAL CRASH (POST) !!!")

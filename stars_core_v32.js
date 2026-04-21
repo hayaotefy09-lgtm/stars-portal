@@ -208,8 +208,11 @@ window.trashResource = async (resId, btn) => {
                 body: JSON.stringify({ id: resId })
             });
 
-            // PROVEN LOGIC: Simple parse and reliable feedback
-            const data = await res.json();
+            // HARDENED HEARTBEAT: Log Status BEFORE parsing
+            const text = await res.text();
+            let data;
+            try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response' }; }
+            
             logAPI('DELETE', '/api/resources/delete', res.status, data.success ? 'Success' : (data.error || 'Server error'));
 
             if (res.ok && data.success) {
@@ -1531,8 +1534,11 @@ window.submitResourceUpload = async () => {
             body: JSON.stringify(payload)
         });
 
-        // PROVEN LOGIC: Simple parse and reliable feedback
-        const data = await response.json();
+        // HARDENED HEARTBEAT: Log BEFORE parsing to capture HTML errors
+        const text = await response.text();
+        let data;
+        try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response' }; }
+        
         logAPI('POST', '/api/resources/upload', response.status, data.success ? 'Success' : (data.error || 'Fail'));
 
         if (data.success) {
