@@ -223,7 +223,7 @@ def sync_from_supabase():
                         category=excluded.category,
                         url=excluded.url
                 """, (
-                    r.get('id'),
+                    str(r.get('id')), # Ensure ID is treated as string for UUID compatibility
                     name,
                     rtype,
                     r.get('size', '0.5 MB'),
@@ -1208,18 +1208,24 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
         self.wfile.write(b'{"success": true}')
 
+    def send_error_json(self, code, message):
+        self.send_response(code)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({"success": False, "error": message}).encode())
+
     def handle_delete_resource(self):
         user = get_user_from_headers(self.headers)
         if not user:
-            self.send_response(401); self.end_headers(); return
+            self.send_error_json(401, "Unauthorized"); return
             
         try:
             content_length = int(self.headers.get('Content-Length', 0))
             data = json.loads(self.rfile.read(content_length).decode())
-            res_id = data.get('id')
+            res_id = str(data.get('id')) # Cast to string for safety
             
             if not res_id:
-                self.send_response(400); self.end_headers(); return
+                self.send_error_json(400, "Missing ID"); return
             
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
@@ -1228,11 +1234,11 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             c.execute("SELECT uploaded_by FROM Resources WHERE id=?", (res_id,))
             row = c.fetchone()
             if not row:
-                conn.close(); self.send_response(404); self.end_headers(); return
+                conn.close(); self.send_error_json(404, "Resource not found"); return
                 
             owner = row[0]
             if user['role'] != 'ProgramStaff' and user['email'].lower() != owner.lower():
-                conn.close(); self.send_response(403); self.end_headers(); return
+                conn.close(); self.send_error_json(403, f"Access Denied: You are not the owner ({owner})"); return
                 
             # Authoritative Wipe
             c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
@@ -1242,14 +1248,15 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             # Cloud Wipe
             try:
                 supabase.table('resources').delete().eq('id', res_id).execute()
-            except: pass
+            except Exception as cloud_e:
+                print(f"CLOUD DELETE WARNING: {cloud_e}")
             
             self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
             self.wfile.write(b'{"success": true}')
             print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']}.")
         except Exception as e:
             print(f"RESOURCE DELETE ERROR: {e}")
-            self.send_response(500); self.end_headers()
+            self.send_error_json(500, str(e))
 
     def handle_get_messages(self, pair_id):
         user = get_user_from_headers(self.headers)

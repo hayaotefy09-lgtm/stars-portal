@@ -197,6 +197,7 @@ window.trashSession = function (sessionId, btn) {
 window.trashResource = async (resId, btn) => {
     window.starsConfirm("Are you sure you want to permanently delete this resource? This action cannot be undone.", async () => {
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+        console.log(`STARS AUTH: Attempting to delete resource ID [${resId}]...`);
         try {
             const res = await fetch('/api/resources/delete', {
                 method: 'POST',
@@ -206,15 +207,27 @@ window.trashResource = async (resId, btn) => {
                 },
                 body: JSON.stringify({ id: resId })
             });
-            const data = await res.json();
-            if (data.status === 'success' || data.success) {
+
+            // Handle non-JSON or error status codes gracefully
+            let data;
+            const text = await res.text();
+            try {
+                data = JSON.parse(text);
+            } catch (jsonErr) {
+                console.error("STARS AUTH: Server returned non-JSON response:", text);
+                data = { success: false, error: `Server returned [${res.status}] error.` };
+            }
+
+            if (res.ok && (data.status === 'success' || data.success)) {
                 alert("✓ Resource permanently removed.");
                 if (window.initDashboard) window.initDashboard();
             } else {
-                alert("❌ Deletion failed: " + (data.error || 'Server error.'));
+                console.error("STARS AUTH: Deletion failed:", data);
+                alert("❌ Deletion failed: " + (data.error || 'Permission denied or record not found.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             }
         } catch (e) {
+            console.error("STARS AUTH: Connectivity error:", e);
             alert("❌ Connectivity Error: " + e.message);
             if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
         }
