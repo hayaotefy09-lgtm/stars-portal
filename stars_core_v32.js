@@ -220,7 +220,7 @@ window.trashResource = async (resId, btn) => {
 
             if (res.ok && (data.status === 'success' || data.success)) {
                 alert("✓ Resource permanently removed.");
-                if (window.initDashboard) window.initDashboard();
+                window.location.reload(); // Authoritative UI reset to clear stale local state
             } else {
                 console.error("STARS AUTH: Deletion failed:", data);
                 alert("❌ Deletion failed: " + (data.error || 'Permission denied or record not found.'));
