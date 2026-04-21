@@ -192,13 +192,17 @@ def sync_from_supabase():
                     print(f"STARS DEBUG: Resource Keys found: {list(r.keys())}")
                     print(f"STARS DEBUG: Resource Data Sample: {r}")
 
-                # Robust metadata mapping (handles potential key variations from different system versions)
-                name = r.get('name') or r.get('title') or 'Resource'
-                rtype = r.get('type') or r.get('file_type') or 'PDF'
-                desc = r.get('description') or r.get('desc') or r.get('summary') or ''
-                cat = r.get('category') or r.get('cat') or 'General'
-                # Check all common URL keys
-                url = r.get('url') or r.get('file_url') or r.get('link') or r.get('path') or ''
+                # Exhaustive Metadata Recovery (handles all possible cloud schema variations)
+                name = r.get('name') or r.get('Name') or r.get('title') or r.get('Title') or 'Resource'
+                rtype = r.get('type') or r.get('Type') or r.get('file_type') or 'PDF'
+                desc = r.get('description') or r.get('Description') or r.get('desc') or r.get('summary') or r.get('Summary') or ''
+                cat = r.get('category') or r.get('Category') or r.get('cat') or 'General'
+                
+                # Check ALL common URL keys (Case-insensitive & Aliases)
+                url = (r.get('url') or r.get('Url') or r.get('URL') or 
+                       r.get('file_url') or r.get('fileUrl') or 
+                       r.get('link') or r.get('Link') or 
+                       r.get('path') or r.get('Path') or '')
 
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
