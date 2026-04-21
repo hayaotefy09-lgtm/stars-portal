@@ -17,7 +17,7 @@ print('Resend Integration (Requests) Ready')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-CLOUD_RESOURCE_COLUMNS = ['id', 'name', 'type', 'size', 'uploaded_by', 'timestamp', 'url', 'category', 'description']
+CLOUD_RESOURCE_COLUMNS = ['id', 'name', 'type', 'size', 'uploaded_by', 'timestamp'] # Structural parity columns
 
 PORT = int(os.environ.get('PORT', 8000))
 DATABASE = 'stars.db'
@@ -1242,11 +1242,13 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.send_error_json(400, "Missing Name"); return
             
         try:
-            # 1. CLOUD-FIRST INSERT: Let the cloud decide the ID
+            # 1. CLOUD-FIRST INSERT: Use ONLY structural columns for authoritative ID assignment
+            # This prevents PGRST204 (Missing Column) errors on the cloud side.
             raw_payload = {
-                "name": name, "type": rtype, "description": desc, "category": category,
-                "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp, "size": "0.5 MB"
+                "name": name, "type": rtype, "timestamp": timestamp, "size": "0.5 MB",
+                "uploaded_by": user['email']
             }
+            # Strictly filter to only columns known to exist in cloud
             safe_payload = {k: v for k, v in raw_payload.items() if k in CLOUD_RESOURCE_COLUMNS and k != 'id'}
             
             print(f"STARS AUTHORITY: Performing Cloud-First Insert for [{name}]...")
