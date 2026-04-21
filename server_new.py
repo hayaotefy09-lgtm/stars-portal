@@ -1278,11 +1278,21 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                       (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
             conn.commit()
             
-            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative)
-            supabase.table('resources').insert({
+            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative) with Column Resilience
+            payload = {
                 "name": name, "type": rtype, "description": desc, "category": category,
                 "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
-            }).execute()
+            }
+            try:
+                supabase.table('resources').insert(payload).execute()
+            except Exception as cloud_err:
+                err_msg = str(cloud_err)
+                if 'category' in err_msg or 'PGRST204' in err_msg:
+                    print(f"STARS AUTHORITY: 'category' column missing in cloud. Retrying without it...")
+                    del payload['category']
+                    supabase.table('resources').insert(payload).execute()
+                else:
+                    raise cloud_err
             
             conn.close()
             print(f"STARS AUTHORITY: Resource [{name}] uploaded and synced by {user['email']}.")
@@ -1324,9 +1334,14 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             if not is_admin and user['email'].lower() != owner.lower():
                 conn.close(); self.send_error_json(403, f"Access Denied: You are not the owner ({owner})"); return
                 
-            # 1. SYNCHRONOUS CLOUD DELETE (Authoritative)
+            # 1. SYNCHRONOUS CLOUD DELETE (Authoritative) with Type Resilience
             if not res_id.startswith('core-'):
-                supabase.table('resources').delete().eq('id', res_id).execute()
+                # Try as Int first, then as String to ensure persistence
+                try: 
+                    res_id_int = int(res_id)
+                    supabase.table('resources').delete().eq('id', res_id_int).execute()
+                except:
+                    supabase.table('resources').delete().eq('id', res_id).execute()
                 print(f"STARS CLOUD: Successfully synced deletion [{res_id}]")
             
             # 2. LOCAL WIPE

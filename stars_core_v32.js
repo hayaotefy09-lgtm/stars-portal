@@ -216,8 +216,18 @@ window.trashResource = async (resId, btn) => {
             logAPI('DELETE', '/api/resources/delete', res.status, data.success ? 'Success' : (data.error || 'Server error'));
 
             if (res.ok && data.success) {
-                alert("✓ Resource permanently removed.");
-                window.location.reload(); 
+                // OPTIMISTIC UI: Remove from list immediately
+                const card = btn ? btn.closest('.resource-card') : null;
+                if (card) {
+                    card.style.opacity = '0';
+                    card.style.transform = 'scale(0.9)';
+                    setTimeout(() => card.remove(), 300);
+                }
+                
+                // DELAYED RELOAD: Ensure cloud propagation
+                setTimeout(() => {
+                    window.location.reload();
+                }, 800);
             } else {
                 alert("❌ Deletion failed: " + (data.error || 'Server error.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -1477,7 +1487,7 @@ window.initDiagnosticOverlay = () => {
         <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
     </div>`;
     document.body.appendChild(diag);
-    logAPI('BOOT', 'System Online', 200, 'v5.0 Precision Ready');
+    logAPI('BOOT', 'System Online', 200, 'v5.1 Resilience Active');
 };
 
 // Initialize Diagnostics and restore handlers
