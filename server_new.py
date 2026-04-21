@@ -193,16 +193,22 @@ def sync_from_supabase():
                     print(f"STARS DEBUG: Resource Data Sample: {r}")
 
                 # Exhaustive Metadata Recovery (handles all possible cloud schema variations)
-                name = r.get('name') or r.get('Name') or r.get('title') or r.get('Title') or 'Resource'
+                # We check for lower, Pascal, and UPPER cases for each key
+                name = r.get('name') or r.get('Name') or r.get('NAME') or r.get('title') or r.get('Title') or 'Resource'
                 rtype = r.get('type') or r.get('Type') or r.get('file_type') or 'PDF'
                 desc = r.get('description') or r.get('Description') or r.get('desc') or r.get('summary') or r.get('Summary') or ''
                 cat = r.get('category') or r.get('Category') or r.get('cat') or 'General'
                 
-                # Check ALL common URL keys (Case-insensitive & Aliases)
+                # Check ALL common URL keys (Comprehensive mapping)
                 url = (r.get('url') or r.get('Url') or r.get('URL') or 
-                       r.get('file_url') or r.get('fileUrl') or 
-                       r.get('link') or r.get('Link') or 
-                       r.get('path') or r.get('Path') or '')
+                       r.get('file_url') or r.get('fileUrl') or r.get('fileURL') or
+                       r.get('link') or r.get('Link') or r.get('LINK') or
+                       r.get('path') or r.get('Path') or r.get('path_url') or '')
+
+                # DEBUG LOG FOR DISCOVERY (Only for the first item to keep logs readable)
+                if res_r.data.index(r) == 0:
+                    print(f"STARS AUTHORITY DEBUG: Found Resource [{name}]. Keys: {list(r.keys())}")
+                    print(f"STARS AUTHORITY DEBUG: Values Sample: desc[{desc[:20]}...] url[{url[:20]}...]")
 
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
@@ -637,6 +643,8 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         elif self.path.startswith('/api/verify_name'):
             # Feature disabled as per user request
             self.send_response(404); self.end_headers()
+        elif self.path.startswith('/api/resources/delete'):
+             self.handle_delete_resource(); return
         elif self.path.startswith('/api/resources/upload'):
             self.handle_upload_resource(data)
         elif self.path.startswith('/api/messages'):
@@ -1199,6 +1207,49 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
         self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
         self.wfile.write(b'{"success": true}')
+
+    def handle_delete_resource(self):
+        user = get_user_from_headers(self.headers)
+        if not user:
+            self.send_response(401); self.end_headers(); return
+            
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            data = json.loads(self.rfile.read(content_length).decode())
+            res_id = data.get('id')
+            
+            if not res_id:
+                self.send_response(400); self.end_headers(); return
+            
+            conn = sqlite3.connect(DATABASE)
+            c = conn.cursor()
+            
+            # Authorization Check: Must be owner OR ProgramStaff
+            c.execute("SELECT uploaded_by FROM Resources WHERE id=?", (res_id,))
+            row = c.fetchone()
+            if not row:
+                conn.close(); self.send_response(404); self.end_headers(); return
+                
+            owner = row[0]
+            if user['role'] != 'ProgramStaff' and user['email'].lower() != owner.lower():
+                conn.close(); self.send_response(403); self.end_headers(); return
+                
+            # Authoritative Wipe
+            c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
+            conn.commit()
+            conn.close()
+            
+            # Cloud Wipe
+            try:
+                supabase.table('resources').delete().eq('id', res_id).execute()
+            except: pass
+            
+            self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
+            self.wfile.write(b'{"success": true}')
+            print(f"STARS AUTHORITY: Resource {res_id} deleted by {user['email']}.")
+        except Exception as e:
+            print(f"RESOURCE DELETE ERROR: {e}")
+            self.send_response(500); self.end_headers()
 
     def handle_get_messages(self, pair_id):
         user = get_user_from_headers(self.headers)

@@ -194,6 +194,33 @@ window.trashSession = function (sessionId, btn) {
     });
 };
 
+window.trashResource = async (resId, btn) => {
+    window.starsConfirm("Are you sure you want to permanently delete this resource? This action cannot be undone.", async () => {
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
+        try {
+            const res = await fetch('/api/resources/delete', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${StarsSession.get().token}`
+                },
+                body: JSON.stringify({ id: resId })
+            });
+            const data = await res.json();
+            if (data.status === 'success' || data.success) {
+                alert("✓ Resource permanently removed.");
+                if (window.initDashboard) window.initDashboard();
+            } else {
+                alert("❌ Deletion failed: " + (data.error || 'Server error.'));
+                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            }
+        } catch (e) {
+            alert("❌ Connectivity Error: " + e.message);
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+        }
+    });
+};
+
 // 4. Auth Handlers
 window.handleAuthSubmit = async function (event, type) {
     if (event) event.preventDefault();
@@ -1253,16 +1280,32 @@ window.renderResources = (r) => {
         const url = x.url && x.url !== 'null' ? x.url : '#';
         const description = x.description && x.description !== 'null' ? x.description : 'No description provided.';
         const hasUrl = url !== '#';
+        const isOwner = (user?.email === x.uploaded_by) || (user?.role === 'ProgramStaff');
 
-        return `<div class="resource-card" style="background:white; border-radius:20px; padding:1.5rem; border:1px solid #f1f5f9; display: flex; flex-direction: column; height: 100%;">
-            <div style="font-weight:800; color:#e84393; margin-bottom:0.5rem; font-size: 1.1rem;">${x.name || 'Untitled Resource'}</div>
-            <p style="font-size:0.85rem; color: #64748b; line-height: 1.5; flex: 1;">${description}</p>
+        return `<div class="resource-card" style="background:white; border-radius:24px; padding:1.75rem; border:1px solid #f1f5f9; display: flex; flex-direction: column; height: 100%; position: relative; transition: all 0.3s ease;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                <div style="font-weight:800; color:#e84393; font-size: 1.15rem; flex: 1; padding-right: 2rem;">${x.name || 'Untitled Resource'}</div>
+                
+                ${isOwner ? `
+                    <button onclick="window.trashResource('${x.id}', this)" title="Delete Resource" 
+                        style="background: #fff1f6; border: none; padding: 0.5rem; border-radius: 10px; cursor: pointer; color: #e84393; display: flex; align-items: center; justify-content: center; position: absolute; right: 1.5rem; top: 1.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"></polyline>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        </svg>
+                    </button>
+                ` : ''}
+            </div>
+
+            <p style="font-size:0.9rem; color: #64748b; line-height: 1.6; flex: 1;">${description}</p>
+            
             <div style="display:flex; gap:0.5rem; margin-top:1.5rem;">
                 ${hasUrl ? `
-                    <button onclick="window.openResourcePreview('${url}', '${x.name}')" class="btn-magenta" style="flex:1; padding:0.7rem; border-radius:12px; font-weight:800; border:none; cursor:pointer; font-size: 0.9rem;">Preview</button>
-                    <a href="${url}" target="_blank" class="btn-white" style="flex:1; text-align:center; text-decoration:none; padding:0.7rem; border-radius:12px; font-weight:800; border:1px solid #fce4ec; color:#e84393; font-size: 0.9rem;">Open Link</a>
+                    <button onclick="window.openResourcePreview('${url}', '${x.name}')" class="btn-magenta" style="flex:1; padding:0.75rem; border-radius:12px; font-weight:800; border:none; cursor:pointer; font-size: 0.9rem;">Preview</button>
+                    <a href="${url}" target="_blank" class="btn-white" style="flex:1; text-align:center; text-decoration:none; padding:0.75rem; border-radius:12px; font-weight:800; border:1px solid #fce4ec; color:#e84393; font-size: 0.9rem;">Open Link</a>
                 ` : `
-                    <div style="flex: 1; text-align: center; color: #94a3b8; font-size: 0.8rem; font-style: italic; padding: 0.5rem;">Link Unavailable</div>
+                    <div style="flex: 1; text-align: center; color: #94a3b8; font-size: 0.85rem; font-style: italic; padding: 0.75rem; background: #f8fafc; border-radius: 12px; border: 1px dashed #e2e8f0;">Link Unavailable</div>
                 `}
             </div>
         </div>`;
