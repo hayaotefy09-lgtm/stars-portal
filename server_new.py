@@ -179,6 +179,41 @@ def sync_from_supabase():
             conn.commit()
             conn.close()
             print(f"STARS AUTHORITY: Sync successful. {len(res.data)} profiles updated.")
+
+        # --- RESOURCE SYNC ---
+        print("STARS AUTHORITY: Synchronizing Library (Resources)...")
+        res_r = supabase.table('resources').select('*').execute()
+        if res_r.data:
+            conn = sqlite3.connect(DATABASE)
+            c = conn.cursor()
+            for r in res_r.data:
+                c.execute("""
+                    INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(id) DO UPDATE SET
+                        name=excluded.name,
+                        type=excluded.type,
+                        size=excluded.size,
+                        uploaded_by=excluded.uploaded_by,
+                        timestamp=excluded.timestamp,
+                        description=excluded.description,
+                        category=excluded.category,
+                        url=excluded.url
+                """, (
+                    r.get('id'),
+                    r.get('name', 'Resource'),
+                    r.get('type', 'PDF'),
+                    r.get('size', '0.5 MB'),
+                    r.get('uploaded_by', ''),
+                    r.get('timestamp', ''),
+                    r.get('description', ''),
+                    r.get('category', 'General'),
+                    r.get('url', '')
+                ))
+            conn.commit()
+            conn.close()
+            print(f"STARS AUTHORITY: Resource sync successful. {len(res_r.data)} items updated.")
+            
     except Exception as e:
         print(f"STARS SYNC ERROR: {e}")
 
@@ -410,8 +445,8 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                     print("DASHBOARD ERROR: No user found in headers")
                     self.send_response(401); self.end_headers(); return
 
-                # Optimization: Cloud sync now handled once on startup/login to prevent dashboard lag
-                # sync_from_supabase()
+                # Authoritative sync on every dashboard load to ensure Library links are fresh
+                sync_from_supabase()
 
                 role = user.get('role')
                 email = user.get('email')

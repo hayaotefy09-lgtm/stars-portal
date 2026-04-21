@@ -1244,13 +1244,29 @@ window.renderResources = (r) => {
     const uploadBtn = document.getElementById('btn-upload-resource');
     if (uploadBtn) uploadBtn.style.display = (user?.role === 'Mentee' || user?.role === 'Visitor' ? 'none' : 'flex');
 
-    g.innerHTML = r.map(x => `<div class="resource-card" style="background:white; border-radius:20px; padding:1.5rem; border:1px solid #f1f5f9;">
-        <div style="font-weight:800; color:#e84393; margin-bottom:0.5rem;">${x.name}</div><p style="font-size:0.8rem;">${x.description}</p>
-        <div style="display:flex; gap:0.5rem; margin-top:1rem;">
-            <button onclick="window.openResourcePreview('${x.url}', '${x.name}')" class="btn-magenta" style="flex:1; padding:0.6rem; border-radius:10px; font-weight:800; border:none; cursor:pointer;">Preview</button>
-            <a href="${x.url}" target="_blank" class="btn-white" style="flex:1; text-align:center; text-decoration:none; padding:0.6rem; border-radius:10px; font-weight:800; border:1px solid #fce4ec; color:#e84393;">Open Link</a>
-        </div>
-    </div>`).join('');
+    if (!r || r.length === 0) {
+        g.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 3rem; color: #94a3b8; font-weight: 600;">No resources available.</div>`;
+        return;
+    }
+
+    g.innerHTML = r.map(x => {
+        const url = x.url && x.url !== 'null' ? x.url : '#';
+        const description = x.description && x.description !== 'null' ? x.description : 'No description provided.';
+        const hasUrl = url !== '#';
+
+        return `<div class="resource-card" style="background:white; border-radius:20px; padding:1.5rem; border:1px solid #f1f5f9; display: flex; flex-direction: column; height: 100%;">
+            <div style="font-weight:800; color:#e84393; margin-bottom:0.5rem; font-size: 1.1rem;">${x.name || 'Untitled Resource'}</div>
+            <p style="font-size:0.85rem; color: #64748b; line-height: 1.5; flex: 1;">${description}</p>
+            <div style="display:flex; gap:0.5rem; margin-top:1.5rem;">
+                ${hasUrl ? `
+                    <button onclick="window.openResourcePreview('${url}', '${x.name}')" class="btn-magenta" style="flex:1; padding:0.7rem; border-radius:12px; font-weight:800; border:none; cursor:pointer; font-size: 0.9rem;">Preview</button>
+                    <a href="${url}" target="_blank" class="btn-white" style="flex:1; text-align:center; text-decoration:none; padding:0.7rem; border-radius:12px; font-weight:800; border:1px solid #fce4ec; color:#e84393; font-size: 0.9rem;">Open Link</a>
+                ` : `
+                    <div style="flex: 1; text-align: center; color: #94a3b8; font-size: 0.8rem; font-style: italic; padding: 0.5rem;">Link Unavailable</div>
+                `}
+            </div>
+        </div>`;
+    }).join('');
 };
 
 window.openResourcePreview = (url, name) => {
