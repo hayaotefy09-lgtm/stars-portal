@@ -196,6 +196,7 @@ window.trashSession = function (sessionId, btn) {
 
 window.trashResource = async (resId, btn) => {
     window.starsConfirm("Are you sure you want to permanently delete this resource? This action cannot be undone.", async () => {
+        logAPI('DELETE', '/api/resources/delete', 0, 'PENDING');
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
         
         try {
@@ -205,13 +206,13 @@ window.trashResource = async (resId, btn) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${StarsSession.get().token}`
                 },
-                body: JSON.stringify({ id: resId })
+                body: JSON.stringify({ resource_id: resId })
             });
 
             // HARDENED HEARTBEAT: Log Status BEFORE parsing
             const text = await res.text();
             let data;
-            try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response' }; }
+            try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response: ' + text.substring(0, 30) }; }
             
             logAPI('DELETE', '/api/resources/delete', res.status, data.success ? 'Success' : (data.error || 'Server error'));
 
@@ -1487,14 +1488,16 @@ window.initDiagnosticOverlay = () => {
         <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
     </div>`;
     document.body.appendChild(diag);
-    logAPI('BOOT', 'System Online', 200, 'v5.2 Whitelisted Ready');
-    
-    // PERSISTENCE LOCK: Ensure overlay survives app state changes
-    setInterval(() => {
+    // Persistence Guard: If overlay is deleted, recreate it
+    if (window.starsPersistenceTimer) clearInterval(window.starsPersistenceTimer);
+    window.starsPersistenceTimer = setInterval(() => {
         if (!document.getElementById('stars-api-diagnostic')) {
+            console.warn("STARS: Heartbeat Overlay lost... Restoring.");
             window.initDiagnosticOverlay();
         }
     }, 2000);
+
+    logAPI('BOOT', 'System Online', 200, 'v5.5 Restoration Ready');
 };
 
 // Initialize Diagnostics and restore handlers
@@ -1527,6 +1530,7 @@ window.submitResourceUpload = async () => {
     }
 
     if (btn) { btn.disabled = true; btn.textContent = 'Posting...'; }
+    logAPI('UPLOAD', '/api/resources/upload', 0, 'PENDING');
 
     try {
         const payload = {
@@ -1554,20 +1558,20 @@ window.submitResourceUpload = async () => {
         // HARDENED HEARTBEAT: Log BEFORE parsing to capture HTML errors
         const text = await response.text();
         let data;
-        try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response' }; }
+        try { data = JSON.parse(text); } catch (e) { data = { success: false, error: 'Malformed Server Response: ' + text.substring(0, 30) }; }
         
-        logAPI('POST', '/api/resources/upload', response.status, data.success ? 'Success' : (data.error || 'Fail'));
+        logAPI('UPLOAD', '/api/resources/upload', response.status, data.success ? 'Success' : (data.error || 'Server error'));
 
         if (data.success) {
             alert("✓ Resource posted successfully!");
             window.location.reload();
         } else {
             alert("❌ Upload failed: " + (data.error || "Server error"));
-            if (btn) { btn.disabled = false; btn.innerText = "Post Resource"; }
+            if (btn) { btn.disabled = false; btn.textContent = "Confirm Upload"; }
         }
-    } catch (e) {
-        logAPI('ERR', '/api/resources/upload', 'Fail', e.message);
-        alert("❌ Connectivity Error: " + e.message);
-        if (btn) { btn.disabled = false; btn.innerText = "Post Resource"; }
+    } catch (error) {
+        logAPI('UPLOAD', 'Connectivity Error', 500, 'FAILED');
+        alert("❌ Upload failed. Check console.");
+        if (btn) { btn.disabled = false; btn.textContent = "Confirm Upload"; }
     }
 };

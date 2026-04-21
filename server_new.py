@@ -519,190 +519,100 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         self.send_response(404); self.end_headers()
 
     def do_GET(self):
-        parsed = urlparse(self.path)
-        params = parse_qs(parsed.query)
+        try:
+            raw_path = self.path.split('?')[0].rstrip('/')
+            if not raw_path: raw_path = '/'
+            print(f">>> STARS API INCOMING: GET {raw_path}")
+            query = urlsplit(self.path).query
+            params = parse_qs(query)
 
-        # --- API: INITIAL DATA (SYSTEM STATUS) ---
-        if self.path.startswith('/api/initial-data') or self.path.startswith('/api/initial_data'):
-            self.get_initial_data(); return
-
-        # --- API: LINK PROFILE (CLOUD AUTHORITATIVE) ---
-        if self.path.startswith('/api/link-profile'):
-            email = params.get('email', [None])[0]
-            uid = params.get('id', [None])[0]
-            if email and uid:
-                print(f"STARS AUTHORITY: Linking {email} to ID {uid} in CLOUD")
-                try:
-                    conn = sqlite3.connect(DATABASE)
-                    c = conn.cursor()
-                    c.execute("UPDATE Users SET id = ? WHERE email = ?", (uid, email))
-                    conn.commit(); conn.close()
-                    supabase.table('profiles').update({"id": uid}).eq('email', email).execute()
-                    self.send_response(200); self.end_headers(); self.wfile.write(json.dumps({"success": True}).encode())
-                except Exception as e:
-                    print(f"LINK ERROR: {e}"); self.send_response(500); self.end_headers()
+            if raw_path == '/api/initial-data' or raw_path == '/api/initial_data':
+                self.get_initial_data(); return
+            elif raw_path == '/api/dashboard':
+                self.handle_dashboard_routing(); return
+            elif raw_path == '/api/resources':
+                self.handle_get_resources(); return
+            elif raw_path == '/api/survey/analytics':
+                self.handle_survey_analytics(); return
+            elif raw_path.startswith('/api/link-profile'):
+                email = params.get('email', [None])[0]
+                uid = params.get('id', [None])[0]
+                if email and uid: self.handle_link_profile(email, uid)
+                return
+            elif raw_path.startswith('/api/messages'):
+                pair_id = params.get('pair_id', [None])[0]
+                self.handle_get_messages(pair_id)
+                return
+            elif raw_path.startswith('/api/admin/data'):
+                self.handle_admin_data_routing()
                 return
 
-        elif self.path.startswith('/api/dashboard'):
-            try:
-                user = get_user_from_headers(self.headers)
-                if not user:
-                    print("DASHBOARD ERROR: No user found in headers")
-                    self.send_response(401); self.end_headers(); return
-
-                # Authoritative sync on every dashboard load to ensure Library links are fresh
-                sync_from_supabase()
-
-                role = user.get('role')
-                email = user.get('email')
-                is_counselor = user.get('isCounselor', False)
-
-                conn = sqlite3.connect(DATABASE)
-                c = conn.cursor()
-                res = {"pairs": [], "mentors": [], "sessions": [], "messages": [], "resources": [], "surveys": []}
-                
-                # AUTHORITATIVE GLOBAL REGISTRY (Triple Tala Compatible)
-                c.execute("""
-                    SELECT u.first_name, u.last_name, u.email, u.bio, u.interests, u.title, u.role,
-                            (SELECT COUNT(*) FROM MentorMenteePair p WHERE p.mentor_email = u.email) as pair_count
-                    FROM Users u
-                """)
-                all_users_raw = c.fetchall()
-                
-                # Mentors list (Visible to all, formatted for identifying duplicate names via email hint)
-                res["mentors"] = [{
-                    "name": f"{row[0]} {row[1]}", 
-                    "email": row[2], 
-                    "bio": row[3] or '', 
-                    "interests": row[4] or '', 
-                    "title": row[5] or 'STARS MENTOR',
-                    "role": row[6],
-                    "is_paired": row[7] > 0
-                } for row in all_users_raw if row[6] == 'Mentor']
-
-                if role == 'Visitor':
-                    conn.close()
-                    self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-                    self.wfile.write(json.dumps(res).encode()); return
-
-                # RELATIONSHIPS (Identified by Email)
-                if role == 'Mentor':
-                    c.execute("""SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p 
-                                 JOIN Users u ON p.mentee_email = u.email WHERE p.mentor_email=?""", (email,))
-                    for row in c.fetchall():
-                        res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentee"})
-                    
-                    c.execute("""SELECT s.id, s.start_time, s.pair_id, u_mentee.first_name, u_mentee.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s 
-                                 LEFT JOIN MentorMenteePair p ON s.pair_id = p.id 
-                                 LEFT JOIN Users u_mentee ON p.mentee_email = u_mentee.email
-                                 LEFT JOIN Users sch ON s.scheduled_by = sch.email
-                                 WHERE p.mentor_email=?""", (email,))
-                    all_sessions = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]}" if r[3] else "Orphaned Pair", "meeting_link": r[5], "status": r[6], "scheduled_by": r[7], "scheduler_name": f"{r[8]} {r[9]}" if r[8] else r[7], "scheduler_role": r[10], "participants": r[11]} for r in c.fetchall()]
-                    
-                    # Privacy Filter: Only show if mentor is a participant
-                    res["sessions"] = [s for s in all_sessions if not s["participants"] or email.lower() in s["participants"].lower()]
-                
-                elif role == 'Mentee':
-                    c.execute("""SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p 
-                                 JOIN Users u ON p.mentor_email = u.email WHERE p.mentee_email=?""", (email,))
-                    for row in c.fetchall():
-                        res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentor"})
-                    
-                    c.execute("""SELECT s.id, s.start_time, s.pair_id, u_mentor.first_name, u_mentor.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s 
-                                 LEFT JOIN MentorMenteePair p ON s.pair_id = p.id 
-                                 LEFT JOIN Users u_mentor ON p.mentor_email = u_mentor.email
-                                 LEFT JOIN Users sch ON s.scheduled_by = sch.email
-                                 WHERE p.mentee_email=?""", (email,))
-                    all_sessions = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]}" if r[3] else "Orphaned Pair", "meeting_link": r[5], "status": r[6], "scheduled_by": r[7], "scheduler_name": f"{r[8]} {r[9]}" if r[8] else r[7], "scheduler_role": r[10], "participants": r[11]} for r in c.fetchall()]
-
-                    # Privacy Filter: Only show if mentee is a participant
-                    res["sessions"] = [s for s in all_sessions if not s["participants"] or email.lower() in s["participants"].lower()]
-                
-                elif is_counselor or role == 'ProgramStaff':
-                     # Staff/Counselors: Full Global Pair Visibility
-                     c.execute("""SELECT m.first_name, m.last_name, s.first_name, s.last_name, p.id, m.email, s.email FROM MentorMenteePair p 
-                                  JOIN Users m ON p.mentor_email = m.email
-                                  JOIN Users s ON p.mentee_email = s.email""")
-                     for row in c.fetchall():
-                         res["pairs"].append({
-                             "mentor_name": f"{row[0]} {row[1]}",
-                             "mentee_name": f"{row[2]} {row[3]}",
-                             "mentor_email": row[5],
-                             "mentee_email": row[6],
-                             "name": f"{row[0]} {row[1]} <-> {row[2]} {row[3]}",
-                             "pair_id": row[4], 
-                             "type": "Pair"
-                         })
-                     c.execute("""SELECT s.id, s.start_time, s.pair_id, m.first_name, m.last_name, me.first_name, me.last_name, s.meeting_link, s.status, s.scheduled_by, sch.first_name, sch.last_name, sch.role, s.participants FROM Sessions s
-                                  LEFT JOIN MentorMenteePair p ON s.pair_id = p.id
-                                  LEFT JOIN Users m ON p.mentor_email = m.email
-                                  LEFT JOIN Users me ON p.mentee_email = me.email
-                                  LEFT JOIN Users sch ON s.scheduled_by = sch.email""")
-                     res["sessions"] = [{"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": (f"{r[3]} {r[4]} <-> {r[5]} {r[6]}" if r[3] else "Orphaned Pair"), "meeting_link": r[7], "status": r[8], "scheduled_by": r[9], "scheduler_name": f"{r[10]} {r[11]}" if r[10] else r[9], "scheduler_role": r[12], "participants": r[13]} for r in c.fetchall()]
-
-                c.execute("SELECT id, name, type, size, category, description, url FROM Resources")
-                res["resources"] = [{"id": r[0], "name": r[1], "type": r[2], "size": r[3], "category": r[4], "description": r[5], "url": r[6]} for r in c.fetchall()]
-                
-                conn.close()
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(res).encode())
-            except Exception as e:
-                import traceback
-                print(f"FATAL DASHBOARD ERROR: {e}")
-                traceback.print_exc()
-                try:
-                    self.send_response(500)
-                    self.send_header('Content-type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps({"error": str(e)}).encode())
-                except: 
-                    pass
-            
-        elif self.path.startswith('/api/messages'):
-            import urllib.parse
-            query = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
-            pair_id = query.get('pair_id', [None])[0]
-            self.handle_get_messages(pair_id)
-        elif self.path.startswith('/api/admin/data'):
-            # Admin Bypass Flow: Check for X-Admin-Bypass header (STARS2026)
-            admin_bypass_header = self.headers.get('X-Admin-Bypass')
-            admin_bypass = (admin_bypass_header == 'STARS2026')
-            print(f"DEBUG: Admin Data Request - Bypass Header: {admin_bypass_header} (Match: {admin_bypass})")
-            
-            user = get_user_from_headers(self.headers)
-            if not admin_bypass and not is_approved_admin(user):
-                 print(f"DEBUG: Admin Data Rejected - No Bypass and User Not Approved")
-                 self.send_response(403); self.end_headers(); return
-            self.handle_admin_data()
-        elif self.path.startswith('/api/survey/analytics'):
-             self.handle_survey_analytics(); return
-        elif self.path == '/api/resources':
-             self.handle_get_resources(); return
-        else:
             return super().do_GET()
+        except Exception as e:
+            import traceback
+            print(f"!!! STARS API CRITICAL SENTINEL (GET) hit by {self.path} !!!")
+            traceback.print_exc()
+            self.send_error_json(500, f"Critical GET Sentinel Error: {str(e)}")
+
+    def handle_dashboard_routing(self):
+        try:
+            user = get_user_from_headers(self.headers)
+            if not user:
+                self.send_response(401); self.end_headers(); return
+            sync_from_supabase()
+            email, role = user.get('email'), user.get('role')
+            conn = sqlite3.connect(DATABASE); c = conn.cursor()
+            res = {"pairs": [], "mentors": [], "sessions": [], "messages": [], "resources": [], "surveys": []}
+            c.execute("SELECT u.first_name, u.last_name, u.email, u.bio, u.interests, u.title, u.role, (SELECT COUNT(*) FROM MentorMenteePair p WHERE p.mentor_email = u.email) as pair_count FROM Users u")
+            res["mentors"] = [{"name": f"{r[0]} {r[1]}", "email": r[2], "bio": r[3] or '', "interests": r[4] or '', "title": r[5] or 'STARS MENTOR', "role": r[6], "is_paired": r[7] > 0} for r in c.fetchall() if r[6] == 'Mentor']
+            if role == 'Mentor':
+                c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentee_email = u.email WHERE p.mentor_email=?", (email,))
+                for row in c.fetchall(): res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentee"})
+            elif role == 'Mentee':
+                c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentor_email = u.email WHERE p.mentee_email=?", (email,))
+                for row in c.fetchall(): res["pairs"].append({"name": f"{row[0]} {row[1]}", "email": row[2], "pair_id": row[3], "type": "Mentor"})
+            c.execute("SELECT id, name, type, size, category, description, url FROM Resources")
+            res["resources"] = [{"id": r[0], "name": r[1], "type": r[2], "size": r[3], "category": r[4], "description": r[5], "url": r[6]} for r in c.fetchall()]
+            conn.close()
+            self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
+            self.wfile.write(json.dumps(res).encode())
+        except Exception as e:
+            self.send_error_json(500, f"Dashboard Routing Error: {str(e)}")
+
+    def handle_link_profile(self, email, uid):
+        try:
+            conn = sqlite3.connect(DATABASE); c = conn.cursor()
+            c.execute("UPDATE Users SET id = ? WHERE email = ?", (uid, email))
+            conn.commit(); conn.close()
+            supabase.table('profiles').update({"id": uid}).eq('email', email).execute()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
+            self.wfile.write(b'{"success": true}')
+        except Exception as e:
+            self.send_error_json(500, f"Link Profile Error: {str(e)}")
+
+    def handle_admin_data_routing(self):
+        admin_bypass = (self.headers.get('X-Admin-Bypass') == 'STARS2026')
+        user = get_user_from_headers(self.headers)
+        if not admin_bypass and not is_approved_admin(user):
+            self.send_response(403); self.end_headers(); return
+        self.handle_admin_data()
+
 
     def do_POST(self):
         try:
-            # 1. PATH NORMALIZATION: Strip queries and trailing slashes
             raw_path = self.path.split('?')[0].rstrip('/')
             if not raw_path: raw_path = '/'
             
-            print(f">>> STARS API INCOMING: POST {raw_path} (Original: {self.path})")
+            print(f">>> STARS API INCOMING: POST {raw_path}")
             
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             
-            # Universal JSON Parse with fallback
             data = {}
             if post_data:
-                try:
-                    data = json.loads(post_data.decode('utf-8'))
-                except:
-                    pass
+                try: data = json.loads(post_data.decode('utf-8'))
+                except: pass
             
-            # Authoritative Routing with Normalized Path
             if raw_path == '/api/login' or raw_path == '/api/verify_password':
                 self.handle_login(data)
             elif raw_path == '/api/visitor':
@@ -730,13 +640,12 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             elif raw_path.startswith('/api/admin'):
                 self.handle_admin_routing(raw_path, data)
             else:
-                print(f"!!! STARS ROUTING FAILURE: No match for POST {raw_path}")
-                self.send_error_json(404, f"Endpoint not found: {raw_path}")
+                self.send_error_json(404, f"Endpoint {raw_path} not found")
         except Exception as e:
             import traceback
-            print("!!! STARS API CRITICAL CRASH (POST) !!!")
+            print(f"!!! STARS API CRITICAL SENTINEL (POST) hit by {self.path} !!!")
             traceback.print_exc()
-            self.send_error_json(500, f"Critical Server error: {str(e)}")
+            self.send_error_json(500, f"Critical API Sentinel Error: {str(e)}")
 
     def handle_survey_routing(self, path, data):
         if 'submit' in path: self.handle_survey_submit(data)
@@ -1934,8 +1843,8 @@ if __name__ == "__main__":
     except Exception as e:
         print(f">>> STARS BOOT WARNING: Reset failed: {e}")
 
-    print(f">>> STARS BOOT: Starting HTTPServer on port {PORT}...")
+    print(f">>> STARS BOOT: Starting ThreadingHTTPServer on port {PORT}...")
     server_address = ('', PORT)
-    httpd = http.server.HTTPServer(server_address, STARSAPIHandler)
-    print(f"STARS Portal Live: Listening on port {PORT}")
+    httpd = http.server.ThreadingHTTPServer(server_address, STARSAPIHandler)
+    print(f"STARS Portal Live: Listening on port {PORT} (THREADED)")
     httpd.serve_forever()
