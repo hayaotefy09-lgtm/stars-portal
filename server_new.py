@@ -260,6 +260,10 @@ def sync_from_supabase():
         # --- PROFILE SYNC ---
         print("STARS AUTHORITY: Synchronizing local registry from Supabase cloud...")
         res = supabase.table('profiles').select('*').execute()
+        
+        # PRE-FETCH CORE NAMES FOR FILTERING
+        core_names = [cr['name'] for cr in CORE_RESOURCES]
+
         if res.data:
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
@@ -306,6 +310,11 @@ def sync_from_supabase():
                 # Exhaustive Metadata Recovery (handles all possible cloud schema variations)
                 # We check for lower, Pascal, and UPPER cases for each key
                 name = r.get('name') or r.get('Name') or r.get('NAME') or r.get('title') or r.get('Title') or 'Resource'
+                
+                # DUPLICATION FILTER: Skip if this record matches a CORE resource name
+                if name in core_names:
+                    continue
+
                 rtype = r.get('type') or r.get('Type') or r.get('file_type') or 'PDF'
                 desc = r.get('description') or r.get('Description') or r.get('desc') or r.get('summary') or r.get('Summary') or ''
                 cat = r.get('category') or r.get('Category') or r.get('cat') or 'General'
@@ -1341,14 +1350,15 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
             
-            # Authorization Check: Must be owner OR ProgramStaff
+            # Authorization Check: Must be owner OR ProgramStaff / Counselor
             c.execute("SELECT uploaded_by FROM Resources WHERE id=?", (res_id,))
             row = c.fetchone()
             if not row:
                 conn.close(); self.send_error_json(404, "Resource not found"); return
                 
             owner = row[0]
-            if user['role'] != 'ProgramStaff' and user['email'].lower() != owner.lower():
+            is_admin = user.get('isCounselor') or user.get('role') == 'ProgramStaff'
+            if not is_admin and user['email'].lower() != owner.lower():
                 conn.close(); self.send_error_json(403, f"Access Denied: You are not the owner ({owner})"); return
                 
             # Authoritative Wipe

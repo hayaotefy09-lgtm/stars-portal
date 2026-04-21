@@ -1451,3 +1451,65 @@ window.triggerSurveyAlert = function (title, msg, link) {
     modal.className = 'parent';
     document.body.appendChild(modal);
 };
+
+window.handleFileSelect = (input) => {
+    const file = input.files[0];
+    const display = document.getElementById('selected-filename');
+    if (file && display) {
+        display.textContent = `Selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+        display.style.color = '#e84393';
+    }
+};
+
+window.submitResourceUpload = async () => {
+    const name = document.getElementById('res-upload-name')?.value;
+    const desc = document.getElementById('res-upload-desc')?.value;
+    const category = document.getElementById('res-upload-category')?.value || 'General';
+    const type = document.getElementById('res-upload-type')?.value || 'PDF';
+    const fileInput = document.getElementById('res-file-input');
+    const btn = document.getElementById('res-confirm-btn');
+
+    if (!name || (!fileInput.files[0] && !document.getElementById('res-upload-url')?.value)) {
+        alert("Please provide a name and select a document.");
+        return;
+    }
+
+    if (btn) { btn.disabled = true; btn.textContent = 'Posting...'; }
+
+    try {
+        const payload = {
+            name,
+            description: desc,
+            category,
+            type,
+            url: '#'
+        };
+
+        // If it's a URL-based upload from the same modal
+        const urlInput = document.getElementById('res-upload-url');
+        if (urlInput && urlInput.value) {
+            payload.url = urlInput.value;
+        }
+
+        const response = await fetch('/api/resources/upload', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${StarsSession.get().token}`
+            },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert("✓ Resource posted successfully!");
+            window.location.reload();
+        } else {
+            alert("❌ Upload failed: " + (data.error || "Server error"));
+        }
+    } catch (e) {
+        alert("❌ Connectivity Error: " + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Post to Library'; }
+    }
+};
