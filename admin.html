@@ -581,19 +581,37 @@
             setTimeout(() => { overlay.style.display = 'none'; }, 300);
         };
 
-        async function deleteUser(event, e) {
+        async function deleteUser(event, email) {
             if (event) {
                 event.preventDefault();
                 event.stopPropagation();
             }
+
             window.showStarsConfirm(
                 "Delete User?",
-                `Are you sure you want to permanently delete account ${e}?`,
+                `Are you sure you want to permanently delete account ${email}?`,
                 async () => {
-                    const res = await fetch(`${API_URL}/api/hard-delete?table=users&email=${e}`, { method: 'DELETE', headers: { 'X-Admin-Bypass': 'STARS2026' } });
-                    if (res.ok) loadData();
+                    try {
+                        const res = await fetch(`/api/delete-user`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Admin-Bypass': 'STARS2026'
+                            },
+                            body: JSON.stringify({ email: email })
+                        });
+
+                        if (res.ok) {
+                            loadData(); // This refreshes the table instantly
+                        } else {
+                            console.error("Server rejected delete");
+                        }
+                    } catch (err) {
+                        console.error("Delete Error:", err);
+                    }
                 }
             );
+        }
         }
 
         async function deletePair(event, id) {
