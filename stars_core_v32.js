@@ -38,6 +38,7 @@ window.showAuthForm = function (id) {
     if (id === 'dash') {
         if (gateway) gateway.style.display = 'none';
         if (app) app.style.display = 'flex';
+        window.dismissLoader(); // Ensure loader is hidden when entering dash
         initDashboard();
         return;
     }
