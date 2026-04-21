@@ -187,6 +187,14 @@ def sync_from_supabase():
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
             for r in res_r.data:
+                # Robust metadata mapping (handles potential key variations from different system versions)
+                name = r.get('name') or r.get('title') or 'Resource'
+                rtype = r.get('type') or r.get('file_type') or 'PDF'
+                desc = r.get('description') or r.get('desc') or r.get('summary') or ''
+                cat = r.get('category') or r.get('cat') or 'General'
+                # Check all common URL keys
+                url = r.get('url') or r.get('file_url') or r.get('link') or r.get('path') or ''
+
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -201,14 +209,14 @@ def sync_from_supabase():
                         url=excluded.url
                 """, (
                     r.get('id'),
-                    r.get('name', 'Resource'),
-                    r.get('type', 'PDF'),
+                    name,
+                    rtype,
                     r.get('size', '0.5 MB'),
                     r.get('uploaded_by', ''),
                     r.get('timestamp', ''),
-                    r.get('description', ''),
-                    r.get('category', 'General'),
-                    r.get('url', '')
+                    desc,
+                    cat,
+                    url
                 ))
             conn.commit()
             conn.close()

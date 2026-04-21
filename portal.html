@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -19,21 +20,25 @@
             margin: 0;
             font-family: 'Outfit', sans-serif;
         }
+
         .portal-wrapper {
             max-width: 900px;
             width: 100%;
             animation: slideUp 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
+
         .portal-header {
             text-align: center;
             margin-bottom: 4rem;
         }
+
         .portal-logo {
             width: 100px;
             height: 100px;
             margin-bottom: 1.5rem;
             filter: drop-shadow(0 10px 20px rgba(232, 67, 147, 0.15));
         }
+
         .portal-title {
             font-size: 4rem;
             font-weight: 800;
@@ -42,6 +47,7 @@
             line-height: 1;
             margin: 0 0 0.5rem 0;
         }
+
         .portal-subtitle {
             font-weight: 600;
             color: var(--text-slate);
@@ -50,13 +56,13 @@
             font-size: 0.9rem;
             margin: 0;
         }
-        
+
         .portal-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
             gap: 1.5rem;
         }
-        
+
         .entry-card {
             background: white;
             padding: 2.5rem;
@@ -72,13 +78,13 @@
             overflow: hidden;
             text-decoration: none;
         }
-        
+
         .entry-card:hover {
             border-color: var(--stars-magenta);
             transform: translateY(-8px);
             box-shadow: 0 25px 60px rgba(232, 67, 147, 0.12);
         }
-        
+
         .entry-card::after {
             content: "→";
             position: absolute;
@@ -90,12 +96,12 @@
             opacity: 0;
             transition: all 0.3s;
         }
-        
+
         .entry-card:hover::after {
             opacity: 1;
             transform: translateY(-50%) translateX(0);
         }
-        
+
         .entry-icon {
             width: 70px;
             height: 70px;
@@ -108,13 +114,13 @@
             flex-shrink: 0;
             transition: all 0.3s;
         }
-        
+
         .entry-card:hover .entry-icon {
             background: var(--stars-magenta);
             color: white;
             transform: scale(1.1) rotate(-5deg);
         }
-        
+
         .entry-text b {
             display: block;
             font-size: 1.4rem;
@@ -122,7 +128,7 @@
             margin-bottom: 0.25rem;
             font-weight: 800;
         }
-        
+
         .entry-text span {
             font-size: 0.95rem;
             color: var(--text-muted);
@@ -139,17 +145,33 @@
         }
 
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(40px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         @media (max-width: 768px) {
-            .portal-grid { grid-template-columns: 1fr; }
-            .visitor-option { grid-column: span 1; }
-            .portal-title { font-size: 3rem; }
+            .portal-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .visitor-option {
+                grid-column: span 1;
+            }
+
+            .portal-title {
+                font-size: 3rem;
+            }
         }
     </style>
 </head>
+
 <body>
 
     <div class="portal-wrapper">
@@ -162,7 +184,12 @@
         <div class="portal-grid">
             <a href="/index.html#register" class="entry-card">
                 <div class="entry-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <polygon
+                            points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2">
+                        </polygon>
+                    </svg>
                 </div>
                 <div class="entry-text">
                     <b>Student Registration</b>
@@ -172,7 +199,11 @@
 
             <a href="/index.html#login" class="entry-card">
                 <div class="entry-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
                 </div>
                 <div class="entry-text">
                     <b>Student Login</b>
@@ -182,7 +213,10 @@
 
             <a href="/index.html#staff-verify" class="entry-card">
                 <div class="entry-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                    </svg>
                 </div>
                 <div class="entry-text">
                     <b>Program Staff</b>
@@ -192,7 +226,11 @@
 
             <a href="/index.html#visitor" class="entry-card visitor-option">
                 <div class="entry-icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                    </svg>
                 </div>
                 <div class="entry-text">
                     <b>Explore as Visitor</b>
@@ -202,5 +240,8 @@
         </div>
     </div>
 
-</body>
+    <footer style="text-align: center; padding: 20px; color: #b2bec3; font-size: 12px; margin-top: 50px;">
+        <p>&copy; 2026 [Haya Otefy]. All Rights Reserved. STARS Portal v1.0</p>
+    </footer>
+
 </html>
