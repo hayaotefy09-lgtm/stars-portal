@@ -224,31 +224,25 @@ def sync_from_supabase_worker():
     """Authoritative Pull of Cloud Registry (Executed in Background)"""
     try:
         # --- BOOTSTRAP CORE MANIFEST ---
-        conn = sqlite3.connect(DATABASE)
-        c = conn.cursor()
-        c.execute("PRAGMA table_info(Resources)")
-        cols = {row[1]: row[2] for row in c.fetchall()}
-        if cols.get('id') == 'INTEGER':
-            print("STARS AUTHORITY: Performing Schema Migration (INTEGER -> TEXT ID)...")
-            # Safe Migration: Backup data, recreate table, restore (simplified as we sync anyway)
-            c.execute("DROP TABLE IF EXISTS Resources")
-            c.execute("""
-                CREATE TABLE Resources (
-                    id TEXT PRIMARY KEY,
-                    name TEXT,
-                    type TEXT,
-                    size TEXT,
-                    uploaded_by TEXT,
-                    timestamp TEXT,
-                    description TEXT,
-                    category TEXT,
-                    url TEXT
-        # Note: force_database_reset() is called at server startup now.
-        
-        # --- BOOTSTRAP CORE MANIFEST ---
         # Ensures critical records always have stable IDs and valid structure
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
+        
+        # Ensure table exists with correct schema
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS Resources (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                type TEXT,
+                size TEXT,
+                uploaded_by TEXT,
+                timestamp TEXT,
+                description TEXT,
+                category TEXT,
+                url TEXT
+            )
+        """)
+        
         for cr in CORE_RESOURCES:
             c.execute("""
                 INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
