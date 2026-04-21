@@ -1234,8 +1234,9 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         if not name:
             self.send_response(400); self.end_headers(); return
             
-        # GENERATE STABLE ID IMMEDIATELY (Prevents double-record glitch)
-        stable_id = f"res_{int(datetime.datetime.now().timestamp())}_{random.randint(1000, 9999)}"
+        # GENERATE STABLE INTEGER ID (Unix Micro-Timestamp)
+        # Higher compatibility with SQL INTEGER primary key while maintaining uniqueness
+        stable_id = int(datetime.datetime.now().timestamp() * 1000)
         
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
@@ -1311,8 +1312,13 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                     supabase.table('resources').delete().eq('id', res_id).execute()
                     print(f"STARS CLOUD: Successfully synced deletion as STR [{res_id}]")
             
-            # 2. LOCAL WIPE
-            c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
+            # 2. LOCAL WIPE (Dual-Type Resilience)
+            # Try as integer first, then as string to ensure no ghosting
+            try:
+                c.execute("DELETE FROM Resources WHERE id=?", (int(res_id),))
+            except:
+                c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
+            
             conn.commit()
             conn.close()
             
