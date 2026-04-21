@@ -7,7 +7,7 @@ import datetime
 import random
 import requests
 import urllib.parse
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, urlsplit, parse_qs
 from supabase import create_client, Client
 import openpyxl
 import os
