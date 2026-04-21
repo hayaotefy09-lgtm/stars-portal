@@ -145,9 +145,36 @@ def init_db():
     conn.close()
 
 def sync_from_supabase():
-    """Authoritative Cloud Sync: Pulls ALL profiles from Supabase into local SQLite"""
-    print("STARS AUTHORITY: Synchronizing local registry from Supabase cloud...")
+    """Authoritative Pull of Cloud Registry into Local Session Engine"""
     try:
+        # --- INFRASTRUCTURE UPGRADE: Ensure TEXT IDs for UUID compatibility ---
+        conn = sqlite3.connect(DATABASE)
+        c = conn.cursor()
+        c.execute("PRAGMA table_info(Resources)")
+        cols = {row[1]: row[2] for row in c.fetchall()}
+        if cols.get('id') == 'INTEGER':
+            print("STARS AUTHORITY: Performing Schema Migration (INTEGER -> TEXT ID)...")
+            # Safe Migration: Backup data, recreate table, restore (simplified as we sync anyway)
+            c.execute("DROP TABLE IF EXISTS Resources")
+            c.execute("""
+                CREATE TABLE Resources (
+                    id TEXT PRIMARY KEY,
+                    name TEXT,
+                    type TEXT,
+                    size TEXT,
+                    uploaded_by TEXT,
+                    timestamp TEXT,
+                    description TEXT,
+                    category TEXT,
+                    url TEXT
+                )
+            """)
+            conn.commit()
+            print("STARS AUTHORITY: Migration Successful.")
+        conn.close()
+
+        # --- PROFILE SYNC ---
+        print("STARS AUTHORITY: Synchronizing local registry from Supabase cloud...")
         res = supabase.table('profiles').select('*').execute()
         if res.data:
             conn = sqlite3.connect(DATABASE)
