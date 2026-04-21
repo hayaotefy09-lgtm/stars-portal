@@ -1487,7 +1487,14 @@ window.initDiagnosticOverlay = () => {
         <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
     </div>`;
     document.body.appendChild(diag);
-    logAPI('BOOT', 'System Online', 200, 'v5.1 Resilience Active');
+    logAPI('BOOT', 'System Online', 200, 'v5.2 Whitelisted Ready');
+    
+    // PERSISTENCE LOCK: Ensure overlay survives app state changes
+    setInterval(() => {
+        if (!document.getElementById('stars-api-diagnostic')) {
+            window.initDiagnosticOverlay();
+        }
+    }, 2000);
 };
 
 // Initialize Diagnostics and restore handlers

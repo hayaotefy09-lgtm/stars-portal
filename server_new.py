@@ -17,6 +17,7 @@ print('Resend Integration (Requests) Ready')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+CLOUD_RESOURCE_COLUMNS = ['id', 'name', 'type', 'size', 'uploaded_by', 'timestamp']
 
 PORT = int(os.environ.get('PORT', 8000))
 DATABASE = 'stars.db'
@@ -297,14 +298,23 @@ def sync_from_supabase_worker():
                        r.get('link') or r.get('Link') or r.get('LINK') or
                        r.get('path') or r.get('Path') or r.get('path_url') or '')
 
+                # 2. STRATEGIC MERGE: Never overwrite local Source-of-Truth with Cloud nulls
+                c.execute("SELECT url, description, category FROM Resources WHERE id=?", (str(r.get('id')),))
+                existing = c.fetchone()
+                
+                # Use cloud values if they exist, otherwise keep local
+                final_url = url if url else (existing[0] if existing else '')
+                final_desc = desc if desc else (existing[1] if existing else '')
+                final_cat = cat if cat else (existing[2] if existing else 'General')
+
                 c.execute("""
                     INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(id) DO UPDATE SET
                         name=excluded.name, type=excluded.type, size=excluded.size,
                         uploaded_by=excluded.uploaded_by, timestamp=excluded.timestamp,
-                        description=excluded.description, category=excluded.category, url=excluded.url
-                """, (str(r.get('id')), name, rtype, r.get('size', '0.5 MB'), r.get('uploaded_by',''), r.get('timestamp',''), desc, cat, url))
+                        description=?, category=?, url=?
+                """, (str(r.get('id')), name, rtype, r.get('size', '0.5 MB'), r.get('uploaded_by',''), r.get('timestamp',''), final_desc, final_cat, final_url))
             conn.commit()
             conn.close()
             print(f"STARS AUTHORITY: Resource sync successful. {len(res_r.data)} items updated.")
@@ -1278,20 +1288,21 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                       (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
             conn.commit()
             
-            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative) with Column Resilience
-            payload = {
+            # 2. SYNCHRONOUS CLOUD SYNC (Whitelisted and Schema-Resilient)
+            raw_payload = {
                 "name": name, "type": rtype, "description": desc, "category": category,
                 "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
             }
+            # Only send columns that Supabase table actually has
+            col_filter = CLOUD_RESOURCE_COLUMNS if 'id' in CLOUD_RESOURCE_COLUMNS else CLOUD_RESOURCE_COLUMNS
+            safe_payload = {k: v for k, v in raw_payload.items() if k in CLOUD_RESOURCE_COLUMNS}
+            
             try:
-                supabase.table('resources').insert(payload).execute()
+                supabase.table('resources').insert(safe_payload).execute()
             except Exception as cloud_err:
-                err_msg = str(cloud_err)
-                if 'category' in err_msg or 'PGRST204' in err_msg:
-                    print(f"STARS AUTHORITY: 'category' column missing in cloud. Retrying without it...")
-                    del payload['category']
-                    supabase.table('resources').insert(payload).execute()
-                else:
+                print(f"STARS AUTHORITY WARNING: Cloud sync failure, but local saved: {cloud_err}")
+                # We already saved locally, so we can report partial success if it's just a schema mismatch
+                if 'PGRST204' not in str(cloud_err):
                     raise cloud_err
             
             conn.close()
@@ -1340,9 +1351,11 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                 try: 
                     res_id_int = int(res_id)
                     supabase.table('resources').delete().eq('id', res_id_int).execute()
-                except:
+                    print(f"STARS CLOUD: Successfully synced deletion as INT [{res_id_int}]")
+                except Exception as e_int:
+                    print(f"STARS CLOUD: Int delete failed/not needed ({e_int}), trying STR...")
                     supabase.table('resources').delete().eq('id', res_id).execute()
-                print(f"STARS CLOUD: Successfully synced deletion [{res_id}]")
+                    print(f"STARS CLOUD: Successfully synced deletion as STR [{res_id}]")
             
             # 2. LOCAL WIPE
             c.execute("DELETE FROM Resources WHERE id=?", (res_id,))
