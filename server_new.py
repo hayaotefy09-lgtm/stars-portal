@@ -17,7 +17,7 @@ print('Resend Integration (Requests) Ready')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-CLOUD_RESOURCE_COLUMNS = ['id', 'name', 'type', 'size', 'uploaded_by', 'timestamp']
+CLOUD_RESOURCE_COLUMNS = ['id', 'name', 'type', 'size', 'uploaded_by', 'timestamp', 'url', 'category', 'description']
 
 PORT = int(os.environ.get('PORT', 8000))
 DATABASE = 'stars.db'
@@ -1233,36 +1233,35 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         
         if not name:
             self.send_response(400); self.end_headers(); return
+            
+        # GENERATE STABLE ID IMMEDIATELY (Prevents double-record glitch)
+        stable_id = f"res_{int(datetime.datetime.now().timestamp())}_{random.randint(1000, 9999)}"
+        
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
-            # 1. IMMEDIATE LOCAL SYNC
-            c.execute("INSERT INTO Resources (name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", 
-                      (name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
+            # 1. IMMEDIATE LOCAL SYNC (Using Stable ID)
+            c.execute("INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", 
+                      (stable_id, name, rtype, '0.5 MB', user['email'], timestamp, desc, category, file_url))
             conn.commit()
             
-            # 2. SYNCHRONOUS CLOUD SYNC (Whitelisted and Schema-Resilient)
+            # 2. SYNCHRONOUS CLOUD SYNC (Authoritative Stable ID)
             raw_payload = {
-                "name": name, "type": rtype, "description": desc, "category": category,
-                "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp
+                "id": stable_id, "name": name, "type": rtype, "description": desc, "category": category,
+                "url": file_url, "uploaded_by": user['email'], "timestamp": timestamp, "size": "0.5 MB"
             }
-            # Only send columns that Supabase table actually has
-            col_filter = CLOUD_RESOURCE_COLUMNS if 'id' in CLOUD_RESOURCE_COLUMNS else CLOUD_RESOURCE_COLUMNS
             safe_payload = {k: v for k, v in raw_payload.items() if k in CLOUD_RESOURCE_COLUMNS}
             
             try:
                 supabase.table('resources').insert(safe_payload).execute()
+                print(f"STARS CLOUD: Resource [{stable_id}] synced successfully.")
             except Exception as cloud_err:
                 print(f"STARS AUTHORITY WARNING: Cloud sync failure, but local saved: {cloud_err}")
-                # We already saved locally, so we can report partial success if it's just a schema mismatch
-                if 'PGRST204' not in str(cloud_err):
-                    raise cloud_err
             
             conn.close()
-            print(f"STARS AUTHORITY: Resource [{name}] uploaded and synced by {user['email']}.")
             self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
-            self.wfile.write(b'{"success": true, "message": "Resource uploaded and synced"}')
+            self.wfile.write(json.dumps({"success": true, "id": stable_id}).encode())
         except Exception as e:
             print(f"STARS RESOURCE UPLOAD ERROR: {e}")
             try: conn.close()
@@ -1283,7 +1282,8 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         conn = sqlite3.connect(DATABASE)
         c = conn.cursor()
         try:
-            res_id = str(data.get('id')) 
+            # Accept both 'id' and 'resource_id' for frontend parity
+            res_id = str(data.get('id') or data.get('resource_id') or '')
             
             if not res_id:
                 conn.close(); self.send_error_json(400, "Missing ID"); return
