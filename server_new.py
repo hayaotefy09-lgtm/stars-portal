@@ -709,6 +709,10 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_schedule(data)
             elif self.path.startswith('/api/survey/'):
                 self.handle_survey_routing(self.path, data)
+            elif self.path.startswith('/api/verify-staff') or self.path.startswith('/api/verify_staff'):
+                self.handle_verify_staff(data)
+            elif self.path.startswith('/api/verify_name'):
+                self.handle_verify_staff_name(data)
             elif self.path.startswith('/api/admin/'):
                 self.handle_admin_routing(self.path, data)
             else:
