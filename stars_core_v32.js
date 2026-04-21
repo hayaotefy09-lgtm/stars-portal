@@ -45,9 +45,7 @@ window.showAuthForm = function (id) {
 
     if (gateway) gateway.style.display = 'flex';
     if (app) app.style.display = 'none';
-    console.log("DEBUG: Changing hash to", id);
     if (id !== 'dash') window.location.hash = (id === 'menu' ? 'menu' : id);
-    console.log("DEBUG: Calling dismissLoader");
     window.dismissLoader();
 
     if (menu) menu.style.display = (id === 'menu' ? 'grid' : 'none');
@@ -985,16 +983,8 @@ window.renderSurveyTrends = function () {
 // 9. Lifecycle
 window.addEventListener('load', () => {
     log("STARS Authority ONLINE.");
-    console.log("DEBUG: Checking session");
-    const session = StarsSession.get();
-    console.log("Session:", session);
-    if (session) {
-        console.log("DEBUG: Entering dash");
-        window.showAuthForm('dash');
-    } else {
-        console.log("DEBUG: Entering menu");
-        window.showAuthForm('menu');
-    }
+    if (StarsSession.get()) window.showAuthForm('dash');
+    else window.showAuthForm('menu');
 });
 
 // Bindings
