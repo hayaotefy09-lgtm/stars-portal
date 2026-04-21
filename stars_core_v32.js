@@ -187,6 +187,9 @@ window.trashSession = function (sessionId, btn) {
                 alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             }
+        } catch (e) {
+            alert("❌ Connectivity Error: " + e.message);
+            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
         }
     });
 };
