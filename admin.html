@@ -568,8 +568,8 @@
             setTimeout(() => modal.classList.add('active'), 10);
             confirmBtn.onclick = async () => {
                 confirmBtn.disabled = true;
+                window.closeStarsModal(); // Close immediately for better UX
                 await onConfirm();
-                window.closeStarsModal();
                 confirmBtn.disabled = false;
             };
         };
@@ -591,7 +591,10 @@
                 "Delete User?",
                 `Are you sure you want to permanently delete account ${email}?`,
                 async () => {
-                    try {
+                        // Visual instant removal for snappy UI
+                        const row = event.target.closest('tr');
+                        if (row) row.style.opacity = '0.5';
+
                         const res = await fetch(`/api/delete-user`, {
                             method: 'POST',
                             headers: {
@@ -602,9 +605,11 @@
                         });
 
                         if (res.ok) {
-                            loadData(); // This refreshes the table instantly
+                            if (row) row.remove(); // Instant UI response
+                            loadData(); // Background refresh to sync
                         } else {
-                            console.error("Server rejected delete");
+                            if (row) row.style.opacity = '1';
+                            alert("Deletion failed. Please check server logs.");
                         }
                     } catch (err) {
                         console.error("Delete Error:", err);
