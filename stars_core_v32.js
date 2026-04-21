@@ -187,10 +187,10 @@ window.trashSession = function (sessionId, btn) {
                 alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
             }
-        } catch (e) {
-            alert("❌ Connectivity Error: " + e.message);
-            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
         }
+    });
+};
+
 window.trashResource = async (resId, btn) => {
     window.starsConfirm("Are you sure you want to permanently delete this resource? This action cannot be undone.", async () => {
         if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
