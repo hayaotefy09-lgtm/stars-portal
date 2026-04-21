@@ -187,6 +187,11 @@ def sync_from_supabase():
             conn = sqlite3.connect(DATABASE)
             c = conn.cursor()
             for r in res_r.data:
+                # DEBUG: Log keys of the first resource to solve the 'Link Unavailable' mystery
+                if res_r.data.index(r) == 0:
+                    print(f"STARS DEBUG: Resource Keys found: {list(r.keys())}")
+                    print(f"STARS DEBUG: Resource Data Sample: {r}")
+
                 # Robust metadata mapping (handles potential key variations from different system versions)
                 name = r.get('name') or r.get('title') or 'Resource'
                 rtype = r.get('type') or r.get('file_type') or 'PDF'
