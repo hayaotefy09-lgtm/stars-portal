@@ -564,7 +564,7 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             self.handle_reset_password(data)
         elif self.path.startswith('/api/sessions/schedule'):
             self.handle_schedule(data)
-        elif self.path.startswith('/api/admin/delete') or self.path == '/api/delete-user':
+        elif self.path.startswith('/api/admin/delete') or self.path.startswith('/api/delete-user'):
             self.handle_admin_delete(data)
         elif self.path == '/api/survey/delete' or self.path.startswith('/api/survey/delete'):
             self.handle_delete_survey(data)
