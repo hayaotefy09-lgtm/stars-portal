@@ -366,7 +366,7 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             c.execute("SELECT first_name, last_name, role, isCounselor FROM Users WHERE email=? AND password=?", (email, pwd))
             r = c.fetchone(); conn.close()
             if r: u = {"email": email, "role": r[2], "name": f"{r[0]} {r[1]}", "isCounselor": bool(r[3]), "firstName": r[0], "lastName": r[1]}
-            else: self.send_response(401); self.end_headers(); return
+            else: self.send_error_json(401, "Invalid login credentials. Please try again."); return
         token = str(uuid.uuid4()); SESSION_STORE[token] = u
         self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
         self.wfile.write(json.dumps({"success": True, "token": token, "user": u}).encode())
@@ -411,7 +411,7 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
     def get_initial_data(self):
         self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(b'{"status": "Online", "v": "8.0"}')
+        self.wfile.write(b'{"status": "Online", "v": "9.0"}')
 
     def handle_admin_routing(self, path, data):
         if 'create' in path: self.handle_admin_create(data)

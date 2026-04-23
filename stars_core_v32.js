@@ -1,4 +1,4 @@
-/* --- STARS AUTHORITATIVE MASTER CORE v6.0 --- */
+/* --- STARS AUTHORITATIVE MASTER CORE v9.0 --- */
 const STARS_DEBUG = true;
 const log = (msg) => STARS_DEBUG && console.log(`[STARS]: ${msg}`);
 
@@ -1497,7 +1497,7 @@ window.initDiagnosticOverlay = () => {
         }
     }, 2000);
 
-    logAPI('BOOT', 'System Online', 200, 'v5.5 Restoration Ready');
+    logAPI('BOOT', 'System Online', 200, 'v9.0 Foundation Ready');
 };
 
 // Initialize Diagnostics and restore handlers
