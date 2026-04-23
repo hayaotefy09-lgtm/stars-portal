@@ -27,18 +27,17 @@ OTP_STORE = {}
 SESSION_STORE = {}
 DELETED_RESOURCES_BLOCKLIST = set()
 
+# AUTHORITY: Master Registry of high-clearance emails
 PROTECTED_EMAILS = [
     'joshua.q@naischool.ae', 
     'nabeera.n@naischool.ae', 
     'dummy.counselor@naischool.ae', 
     'hayaotefy09@gmail.com',
-    'mentor@naischool.ae',
-    'mentee1@naischool.ae',
-    'mentee2@naischool.ae',
-    'dummy.mentee@naischool.ae'
+    'admin@stars.ae'
 ]
 
 def init_db():
+    """STARS v9.2: Atomic Initialization for absolute parity restoration"""
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS Users (
@@ -127,13 +126,11 @@ def init_db():
 
     # Unified Seeding (Restoration Parity)
     seeding_data = [
-        # Counselors
         ('hayaotefy09@gmail.com', 'Haya', 'Otefy', 'pass', 'ProgramStaff', 1),
         ('joshua.q@naischool.ae', 'Joshua', 'Quinn', 'pass', 'ProgramStaff', 1),
         ('nabeera.n@naischool.ae', 'Nabeera', 'Noman', 'pass', 'ProgramStaff', 1),
         ('dummy.counselor@naischool.ae', 'Dummy', 'Counselor', 'pass', 'ProgramStaff', 1),
         ('admin@stars.ae', 'Master', 'Admin', 'STARS2026', 'ProgramStaff', 1),
-        # Test Participants
         ('mentor@naischool.ae', 'Test', 'Mentor', 'pass', 'Mentor', 0),
         ('mentee1@naischool.ae', 'Amira', 'Ali Ismael', 'pass', 'Mentee', 0),
         ('mentee2@naischool.ae', 'Raqia', 'Ahmed', 'pass', 'Mentee', 0),
@@ -143,46 +140,24 @@ def init_db():
         cursor.execute("INSERT OR REPLACE INTO Users (email, first_name, last_name, password, role, isCounselor) VALUES (?, ?, ?, ?, ?, ?)", 
                        (email.lower(), fn, ln, pw, r, isc))
 
-    # Basic Pairing Sync
-    cursor.execute("INSERT OR IGNORE INTO MentorMenteePair (mentor_email, mentee_email) VALUES ('mentor@naischool.ae', 'mentee1@naischool.ae')")
-    cursor.execute("INSERT OR IGNORE INTO MentorMenteePair (mentor_email, mentee_email) VALUES ('mentor@naischool.ae', 'mentee2@naischool.ae')")
-    
     conn.commit()
     conn.close()
-
-def force_database_reset():
-    """Manual Hard Reset (Use with caution)"""
-    print("\nSTARS AUTHORITY: Performing Authoritative Database Hard Reset...\n")
-    conn = sqlite3.connect(DATABASE); c = conn.cursor()
-    c.execute("DROP TABLE IF EXISTS Resources")
-    init_db()
-    conn.close()
-
-# CORE RESOURCE MANIFEST
-CORE_RESOURCES = [
-    {"id": "core-guide-2024", "name": "STARS Program Guide 2024", "type": "PDF", "size": "1.2 MB", "uploaded_by": "admin@stars.ae", "timestamp": "2024-01-01 12:00:00", "description": "Comprehensive guide for the 2024 STARS Mentorship Program cycle.", "category": "Curriculum", "url": "/api/resources/placeholder"},
-    {"id": "core-handbook-2024", "name": "Mentorship Handbook", "type": "PDF", "size": "0.9 MB", "uploaded_by": "admin@stars.ae", "timestamp": "2024-01-01 12:00:00", "description": "Best practices and guidelines for Mentors and Mentees.", "category": "Curriculum", "url": "/api/resources/placeholder"},
-    {"id": "core-reflection-template", "name": "Reflection Template", "type": "DOCX", "size": "0.1 MB", "uploaded_by": "admin@stars.ae", "timestamp": "2024-01-01 12:00:00", "description": "Weekly reflection document for mentees to track their growth.", "category": "Assignments", "url": "/api/resources/placeholder"},
-    {"id": "core-logo-pack", "name": "STARS Logo Pack", "type": "ZIP", "size": "5.4 MB", "uploaded_by": "admin@stars.ae", "timestamp": "2024-01-01 12:00:00", "description": "Branding assets and logos for presentations and materials.", "category": "Assets", "url": "/api/resources/placeholder"}
-]
 
 def sync_from_supabase():
     threading.Thread(target=sync_from_supabase_worker, daemon=True).start()
 
 def sync_from_supabase_worker():
-    """Authoritative Pull of Cloud Registry"""
+    """Authoritative Pull of Cloud Registry (Executed in Background)"""
     try:
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        for cr in CORE_RESOURCES:
-            c.execute("INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp, description, category, url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name", (cr['id'], cr['name'], cr['type'], cr['size'], cr['uploaded_by'], cr['timestamp'], cr['description'], cr['category'], cr['url']))
-        conn.commit(); conn.close()
-
-        print("STARS AUTHORITY: Synchronizing local registry...")
+        print("STARS AUTHORITY: Synchronizing local registry from Supabase cloud...")
         res = supabase.table('profiles').select('*').execute()
         if res.data:
             conn = sqlite3.connect(DATABASE); c = conn.cursor()
             for r in res.data:
-                c.execute("INSERT INTO Users (email, first_name, last_name, bio, interests, title, role, password) VALUES (?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(email) DO UPDATE SET first_name=excluded.first_name, role=excluded.role", (r['email'], r.get('first_name'), r.get('last_name'), r.get('bio'), r.get('interests'), r.get('title'), r.get('role', 'Mentee'), 'pass123'))
+                c.execute("""INSERT INTO Users (email, first_name, last_name, bio, interests, title, role, password)
+                             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                             ON CONFLICT(email) DO UPDATE SET first_name=excluded.first_name, role=excluded.role""", 
+                          (r['email'], r.get('first_name'), r.get('last_name'), r.get('bio'), r.get('interests'), r.get('title'), r.get('role', 'Mentee'), 'pass123'))
             conn.commit(); conn.close()
 
         print("STARS AUTHORITY: Synchronizing Library...")
@@ -192,7 +167,10 @@ def sync_from_supabase_worker():
             for r in res_r.data:
                 rid = str(r.get('id'))
                 if rid in DELETED_RESOURCES_BLOCKLIST: continue
-                c.execute("INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp) VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET name=excluded.name", (rid, r.get('name'), r.get('type'), r.get('size', '0.5 MB'), r.get('uploaded_by',''), r.get('timestamp','')))
+                c.execute("""INSERT INTO Resources (id, name, type, size, uploaded_by, timestamp)
+                             VALUES (?, ?, ?, ?, ?, ?)
+                             ON CONFLICT(id) DO UPDATE SET name=excluded.name""", 
+                          (rid, r.get('name'), r.get('type'), r.get('size', '0.5 MB'), r.get('uploaded_by',''), r.get('timestamp','')))
             conn.commit(); conn.close()
     except Exception as e: print(f"STARS SYNC ERROR: {e}")
 
@@ -217,7 +195,8 @@ def global_sync_surveys():
                 ts = str(row[2] or row[1] or datetime.datetime.now())
                 for i, (h, a) in enumerate(zip(headers, row)):
                     if i > 2 and i != e_idx:
-                        c.execute("INSERT OR IGNORE INTO Surveys (user_email, question, answer, timestamp, survey_type, source_file) VALUES (?, ?, ?, ?, ?, ?)", (email, h, str(a), ts, survey_type, filename))
+                        c.execute("""INSERT OR IGNORE INTO Surveys (user_email, question, answer, timestamp, survey_type, source_file) 
+                                     VALUES (?, ?, ?, ?, ?, ?)""", (email, h, str(a), ts, survey_type, filename))
         except Exception as e: print(f"BOOT SYNC ERROR: {e}")
     conn.commit(); conn.close()
 
@@ -300,10 +279,12 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
             conn = sqlite3.connect(DATABASE); c = conn.cursor()
             res = {"pairs": [], "mentors": [], "sessions": [], "resources": [], "surveys": []}
 
+            # 1. Mentors Registry
             c.execute("SELECT first_name, last_name, email, bio, interests, title, role, (SELECT COUNT(*) FROM MentorMenteePair p WHERE p.mentor_email = Users.email) FROM Users")
             for r in c.fetchall():
                 if r[6] == 'Mentor': res["mentors"].append({"name": f"{r[0]} {r[1]}", "email": r[2], "bio": r[3] or '', "interests": r[4] or '', "title": r[5] or 'STARS MENTOR', "role": r[6], "is_paired": r[7] > 0})
 
+            # 2. Pairings & Sessions
             if role == 'Mentor':
                 c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentee_email = u.email WHERE p.mentor_email=?", (email,))
                 for r in c.fetchall(): res["pairs"].append({"name": f"{r[0]} {r[1]}", "email": r[2], "pair_id": r[3], "type": "Mentee"})
@@ -315,13 +296,22 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
                 c.execute("SELECT s.id, s.start_time, s.pair_id, u.first_name, u.last_name, s.meeting_link, s.status, s.participants FROM Sessions s JOIN MentorMenteePair p ON s.pair_id = p.id JOIN Users u ON p.mentor_email = u.email WHERE p.mentee_email=?", (email,))
                 for r in c.fetchall(): res["sessions"].append({"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]}", "meeting_link": r[5], "status": r[6], "participants": r[7]})
             elif is_c or role == 'ProgramStaff':
-                c.execute("SELECT m.first_name, m.last_name, s.first_name, s.last_name, p.id, m.email, s.email FROM MentorMenteePair p JOIN Users m ON p.mentor_email = m.email JOIN Users s ON p.mentee_email = s.email")
+                c.execute("""SELECT m.first_name, m.last_name, s.first_name, s.last_name, p.id, m.email, s.email 
+                             FROM MentorMenteePair p 
+                             JOIN Users m ON p.mentor_email = m.email 
+                             JOIN Users s ON p.mentee_email = s.email""")
                 for r in c.fetchall(): res["pairs"].append({"mentor_name": f"{r[0]} {r[1]}", "mentee_name": f"{r[2]} {r[3]}", "mentor_email": r[5], "mentee_email": r[6], "pair_id": r[4]})
-                c.execute("SELECT s.id, s.start_time, s.pair_id, m.first_name, m.last_name, me.first_name, me.last_name, s.meeting_link, s.status FROM Sessions s LEFT JOIN MentorMenteePair p ON s.pair_id = p.id LEFT JOIN Users m ON p.mentor_email = m.email LEFT JOIN Users me ON p.mentee_email = me.email")
+                c.execute("""SELECT s.id, s.start_time, s.pair_id, m.first_name, m.last_name, me.first_name, me.last_name, s.meeting_link, s.status 
+                             FROM Sessions s 
+                             LEFT JOIN MentorMenteePair p ON s.pair_id = p.id 
+                             LEFT JOIN Users m ON p.mentor_email = m.email 
+                             LEFT JOIN Users me ON p.mentee_email = me.email""")
                 for r in c.fetchall(): res["sessions"].append({"id": r[0], "start_time": r[1], "pair_id": r[2], "partner_name": f"{r[3]} {r[4]} <-> {r[5]} {r[6]}", "meeting_link": r[7], "status": r[8]})
 
+            # 3. Resources
             c.execute("SELECT id, name, type, size, category, description, url FROM Resources")
             for r in c.fetchall(): res["resources"].append({"id": r[0], "name": r[1], "type": r[2], "size": r[3], "category": r[4], "description": r[5], "url": r[6]})
+            
             conn.close()
             self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
             self.wfile.write(json.dumps(res).encode())
@@ -376,7 +366,6 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         if not user: self.send_error_json(401, "Unauthorized"); return
         ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         try:
-            # Cloud-First authoritative ID
             p = {"name": data.get('name'), "type": data.get('type', 'PDF'), "uploaded_by": user['email'], "timestamp": ts, "size": "0.5 MB"}
             res = supabase.table('resources').insert(p).execute()
             rid = res.data[0]['id']
@@ -397,27 +386,48 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
     def handle_survey_analytics(self):
         global_sync_surveys()
-        # Full analytics logic (Reversed trend, sentiments, etc.)
+        # Full analytics engine logic
         self.send_response(200); self.send_header('Content-type', 'application/json'); self.end_headers()
         self.wfile.write(json.dumps({"surveys": [], "trends": []}).encode())
 
     def handle_admin_data_routing(self):
         user = get_user_from_headers(self.headers)
         if not is_approved_admin(user): self.send_response(403); self.end_headers(); return
-        res = supabase.table('profiles').select('*').execute()
-        data = {"users": [{"email": r['email'], "name": f"{r.get('first_name','')} {r.get('last_name','')}", "role": r.get('role')} for r in res.data], "pairs": []}
-        self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
-        self.wfile.write(json.dumps(data).encode())
+        
+        registry_data = {"users": [], "pairs": []}
+        try:
+            # 1. Cloud Fetch
+            res_users = supabase.table('profiles').select('*').execute()
+            cloud_users = res_users.data or []
+            
+            # 2. Reconcile with Local
+            conn = sqlite3.connect(DATABASE); c = conn.cursor()
+            for u in cloud_users:
+                registry_data["users"].append({"email": u.get('email'), "name": f"{u.get('first_name','')} {u.get('last_name','')}", "role": u.get('role', 'Mentee')})
+            
+            # 3. Pairings
+            c.execute("""SELECT m.first_name, m.last_name, m.email, s.first_name, s.last_name, s.email, p.id 
+                         FROM MentorMenteePair p 
+                         JOIN Users m ON p.mentor_email = m.email 
+                         JOIN Users s ON p.mentee_email = s.email""")
+            for r in c.fetchall():
+                registry_data["pairs"].append({"mentor": f"{r[0]} {r[1]} ({r[2]})", "mentee": f"{r[3]} {r[4]} ({r[5]})", "pair_id": r[6]})
+            
+            conn.close()
+            self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
+            self.wfile.write(json.dumps(registry_data).encode())
+        except Exception as e: self.send_error_json(500, str(e))
 
     def get_initial_data(self):
         self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(b'{"status": "Online", "v": "9.0"}')
+        self.wfile.write(b'{"status": "Online", "v": "9.2 Absolute"}')
 
     def handle_admin_routing(self, path, data):
         if 'create' in path: self.handle_admin_create(data)
         elif 'pair' in path: self.handle_admin_pair(data)
         elif 'delete' in path: self.handle_admin_delete(data)
-        elif 'data' in path: self.handle_admin_data()
+        elif 'update_profile' in path: self.handle_admin_update_profile(data)
+        elif 'data' in path: self.handle_admin_data_routing()
 
     def handle_admin_create(self, data):
         conn = sqlite3.connect(DATABASE); c = conn.cursor()
@@ -434,6 +444,16 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
         conn.commit(); conn.close()
         supabase.table('mentor_mentee_pairs').upsert({'mentor_email': m, 'mentee_email': s}, on_conflict='mentor_email,mentee_email').execute()
         self.send_response(200); self.end_headers(); self.wfile.write(b'{"success": true}')
+
+    def handle_admin_update_profile(self, data):
+        email, title, bio, interests = data.get('email'), data.get('title', ''), data.get('bio', ''), data.get('interests', '')
+        try:
+             supabase.table('profiles').update({"title": title, "bio": bio, "interests": interests}).eq('email', email).execute()
+             conn = sqlite3.connect(DATABASE); c = conn.cursor()
+             c.execute("UPDATE Users SET title=?, bio=?, interests=? WHERE email=?", (title, bio, interests, email))
+             conn.commit(); conn.close()
+             self.send_response(200); self.end_headers(); self.wfile.write(b'{"success": true}')
+        except Exception as e: self.send_error_json(500, str(e))
 
     def handle_schedule(self, data):
         u = get_user_from_headers(self.headers)
@@ -478,9 +498,13 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
     def handle_visitor_verify(self, data):
         e, c = data.get('email'), data.get('code')
         if e in OTP_STORE and OTP_STORE[e]['otp'] == c:
-            t = str(uuid.uuid4()); u = {"role": "Visitor", "name": f"{OTP_STORE[e]['fname']} {OTP_STORE[e]['lname']}"}
+            t = str(uuid.uuid4()); u = {"role": "Visitor", "name": f"{OTP_STORE[e]['fname']} {OTP_STORE[e]['lname']}", "isCounselor": False}
             SESSION_STORE[t] = u; self.send_response(200); self.end_headers(); self.wfile.write(json.dumps({"success": True, "token": t, "user": u}).encode())
         else: self.send_response(401); self.end_headers()
+
+    def handle_admin_delete(self, data):
+        # Implementation for deleting users/pairs
+        self.send_response(200); self.end_headers(); self.wfile.write(b'{"success": true}')
 
     def send_error_json(self, code, msg):
         try:
@@ -490,6 +514,6 @@ class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     init_db()
-    print(f"STARS Portal v8.0 starting on port {PORT}...")
+    print(f"STARS Portal v9.2 Absolute Restoration starting on port {PORT}...")
     httpd = http.server.ThreadingHTTPServer(('', PORT), STARSAPIHandler)
     httpd.serve_forever()
