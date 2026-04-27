@@ -503,10 +503,23 @@
         function renderUsersTable(users) {
             let uHTML = '';
             users.forEach(u => {
-                const p = u.role === 'Mentor' ? 'mentor' : (u.role === 'ProgramStaff' ? 'staff' : 'mentee');
-                uHTML += `<tr><td><span class="pill ${p}">${u.role}</span></td><td>${u.name}</td><td>${u.email}</td><td><button type="button" class="btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="deleteUser(event, '${u.email}')">Del</button></td></tr>`;
+                const role = u.role || 'Mentee';
+                const p = (role === 'Mentor') ? 'mentor' : ((role === 'ProgramStaff' || role === 'Counselor') ? 'staff' : 'mentee');
+                
+                // Name Resolution Master Logic
+                const name = u.full_name || u.name || u.displayName || 
+                           (u.first_name ? `${u.first_name} ${u.last_name || ''}`.strip() : '') || 
+                           (u.firstName ? `${u.firstName} ${u.lastName || ''}`.strip() : '') || 
+                           'Unknown User';
+                
+                uHTML += `<tr>
+                    <td><span class="pill ${p}">${role}</span></td>
+                    <td><strong style="color:#1e293b;">${name}</strong></td>
+                    <td><code style="font-size:0.8rem; color:#64748b;">${u.email || 'N/A'}</code></td>
+                    <td><button type="button" class="btn-danger" style="padding: 0.2rem 0.6rem; font-size: 0.7rem; border-radius: 6px; font-weight:700;" onclick="deleteUser(event, '${u.email}')">REMOVE</button></td>
+                </tr>`;
             });
-            document.getElementById('users-body').innerHTML = uHTML || '<tr><td colspan="4">No users found in registry.</td></tr>';
+            document.getElementById('users-body').innerHTML = uHTML || '<tr><td colspan="4" style="text-align:center; padding:3rem; color:#94a3b8;">No users found in registry.</td></tr>';
         }
 
         function renderPairsTable(pairs) {

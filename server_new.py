@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "161.0 Thematic Lock"})
+    return jsonify({"status": "Online", "v": "162.0 Resolution Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
