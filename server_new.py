@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "151.0 Database-Synced"})
+    return jsonify({"status": "Online", "v": "153.0 Library Hardened"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -341,12 +341,24 @@ def handle_upload_resource_file():
                 n = name_match.group(1)
                 if file_match: form[n] = {'filename': file_match.group(1), 'content': body}
                 else: form[n] = body.decode('utf-8', errors='ignore')
-        if 'file' not in form: return jsonify({"error": "No file part"}), 400
         file_item = form['file']; fn = f"{uuid.uuid4()}_{file_item['filename']}"
         mime, _ = mimetypes.guess_type(file_item['filename'])
-        supabase_admin.storage.from_('resource-files').upload(path=fn, file=file_item['content'], file_options={"content-type": mime or 'application/octet-stream'})
-        url = supabase_admin.storage.from_('resource-files').get_public_url(fn)
-        supabase_admin.table('resources').insert({"id": str(uuid.uuid4())[:8], "name": form.get('name', file_item['filename']), "type": form.get('type', 'Document'), "uploaded_by": u['email'], "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "description": form.get('description', ''), "category": form.get('category', 'General'), "url": url}).execute()
+        
+        # CORRECT BUCKET: shared-resources
+        supabase_admin.storage.from_('shared-resources').upload(path=fn, file=file_item['content'], file_options={"content-type": mime or 'application/octet-stream'})
+        url = supabase_admin.storage.from_('shared-resources').get_public_url(fn)
+        
+        # INSERT WITHOUT MANUAL ID (Let DB handle bigint)
+        res_data = {
+            "name": form.get('name', file_item['filename']),
+            "type": form.get('type', 'Document'),
+            "uploaded_by": u['email'],
+            "timestamp": datetime.datetime.now().isoformat(),
+            "description": form.get('description', ''),
+            "category": form.get('category', 'General'),
+            "url": url
+        }
+        supabase_admin.table('resources').insert(res_data).execute()
         return jsonify({"success": True, "url": url})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -355,9 +367,26 @@ def handle_resource_delete():
     u = get_user_from_headers()
     if not u: return jsonify({"error": "Auth Required"}), 401
     try:
-        data = request.get_json(); rid = data.get('resource_id')
-        supabase_admin.table('resources').delete().eq('id', rid).execute()
-        return jsonify({"success": True})
+        data = request.get_json(); 
+        rid = data.get('id') or data.get('resource_id')
+        if not rid: return jsonify({"error": "Resource ID required"}), 400
+        
+        # SCHEMA FALLBACK: Try multiple table names and ID types
+        errs = []
+        for table in ['resources', 'Resources', 'Library']:
+            try:
+                # Try as integer first (STARS default)
+                try:
+                    supabase_admin.table(table).delete().eq('id', int(rid)).execute()
+                    return jsonify({"success": True})
+                except:
+                    # Fallback to string ID
+                    supabase_admin.table(table).delete().eq('id', str(rid)).execute()
+                    return jsonify({"success": True})
+            except Exception as e:
+                errs.append(str(e))
+                continue
+        return jsonify({"error": f"Delete failed: {'; '.join(errs)}"}), 500
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sessions/delete', methods=['POST'])
