@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "150.0 Virtual Auth Master"})
+    return jsonify({"status": "Online", "v": "151.0 Database-Synced"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
