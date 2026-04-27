@@ -13,7 +13,7 @@ from supabase import create_client, Client
 app = Flask(__name__)
 CORS(app)
 
-print('BARS Flask Cloud Server Initializing...')
+print('STARS Flask Cloud Server Initializing...')
 SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://cojvbregrwqgnzscmmub.supabase.co")
 SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MjYxNDIsImV4cCI6MjA5MjUwMjE0Mn0.QCnDJtL7oYuvL8spFWaMWAxA6DG6u7lMid1a79yqYQI")
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjkyNjE0MiwiZXhwIjoyMDkyNTAyMTQyfQ.eRgflZH9Qy2EXIVkIAN0xd5tFf9mO2pM-Iqr8IFnv7s")
@@ -24,8 +24,8 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 SESSION_STORE = {}
 
 def get_user_from_headers():
-    if request.headers.get('X-Admin-Bypass') == 'BARS2026':
-        return {"email": "admin@bars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
+    if request.headers.get('X-Admin-Bypass') == 'STARS2026':
+        return {"email": "admin@stars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
     auth = request.headers.get('Authorization')
     if auth and auth.startswith('Bearer '):
         token = auth.split(' ')[1]
@@ -48,7 +48,7 @@ def init_cloud_seed():
     """Developer Seeding: Ensures the main Admin account exists in Supabase."""
     print("[SEED]: Verifying Admin account...")
     try:
-        admin_email = "admin@bars.ae"
+        admin_email = "admin@stars.ae"
         found = False
         for table in ['users', 'profiles', 'Registry']:
             try:
@@ -62,7 +62,7 @@ def init_cloud_seed():
                 "email": admin_email,
                 "full_name": "System Administrator",
                 "role": "ProgramStaff",
-                "password": "bars",
+                "password": "pass",
                 "bio": "System Root Account",
                 "interests": "Administration"
             }
