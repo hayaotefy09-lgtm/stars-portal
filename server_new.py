@@ -13,7 +13,7 @@ from supabase import create_client, Client
 app = Flask(__name__)
 CORS(app)
 
-print('BARS Flask Cloud Server Initializing...')
+print('STARS Flask Cloud Server Initializing...')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
 SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I"
@@ -24,8 +24,8 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 SESSION_STORE = {}
 
 def get_user_from_headers():
-    if request.headers.get('X-Admin-Bypass') == 'BARS2026':
-        return {"email": "admin@bars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
+    if request.headers.get('X-Admin-Bypass') == 'STARS2026':
+        return {"email": "admin@stars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
     auth = request.headers.get('Authorization')
     if auth and auth.startswith('Bearer '):
         token = auth.split(' ')[1]
@@ -83,7 +83,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "148.0 Force-STARS"})
+    return jsonify({"status": "Online", "v": "149.0 Authoritative Logic"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -146,6 +146,7 @@ def handle_login():
     try:
         data = request.get_json(); e, p = data.get('email', '').lower().strip(), data.get('password', '')
         resp = None
+        resp = None
         for table in ['users', 'profiles', 'Registry', 'Staff']:
             try:
                 r = supabase_admin.table(table).select('*').eq('email', e).eq('password', p).execute()
@@ -194,6 +195,7 @@ def register():
 @app.route('/api/verify-staff', methods=['POST'])
 def handle_verify_staff():
     data = request.get_json(); e = data.get('email', '').lower().strip()
+    resp = None
     print(f"[VERIFY]: Checking email '{e}' in tables...")
     for table in ['users', 'profiles', 'Registry', 'Staff']:
         try:
