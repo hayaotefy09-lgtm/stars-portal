@@ -1617,13 +1617,12 @@ window.renderWhiteboard = async function() {
         }
 
         const user = StarsSession.get().user;
-        const role = window.normalize_role ? window.normalize_role(user.role) : (user.role === 'ProgramStaff' ? 'ProgramStaff' : 'Mentor');
-        const isMaster = role === 'ProgramStaff';
+        const isStaff = user.role === 'ProgramStaff' || !!user.isCounselor || !!user.is_counselor;
 
-        // HIDE POST BOX FOR NON-MENTORS
+        // HIDE POST BOX FOR NON-MENTORS (Staff see all, but don't post)
         const postBox = document.getElementById('whiteboard-input-card');
         if (postBox) {
-            postBox.style.display = (role === 'Mentor') ? 'block' : 'none';
+            postBox.style.setProperty('display', isStaff ? 'none' : 'block', 'important');
         }
 
         container.innerHTML = notes.map(n => `
