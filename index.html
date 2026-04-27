@@ -779,6 +779,33 @@
                 </div>
             </section>
 
+            <!-- WHITEBOARD PAGE -->
+            <section id="whiteboard" class="page">
+                <div class="banner-block">
+                    <div>
+                        <h1>Whiteboard</h1>
+                        <p>Persistent notes, session feedback & thoughts.</p>
+                    </div>
+                    <div class="banner-logo-box">
+                        <img src="assets/logo.png" alt="STARS">
+                    </div>
+                </div>
+
+                <div style="background:white; border-radius:24px; padding:2rem; border:1.5px solid #fce4ec; margin-bottom:3rem; box-shadow:0 10px 30px rgba(232,67,147,0.05);">
+                    <div class="section-title">CREATE NEW NOTE</div>
+                    <textarea id="whiteboard-input" placeholder="What's on your mind? Capture session notes or feedback here..."
+                        style="width:100%; min-height:120px; padding:1.5rem; border-radius:16px; border:2px solid #f1f5f9; outline:none; font-family:inherit; font-size:1rem; margin-bottom:1.5rem; transition:0.2s;"></textarea>
+                    <div style="display:flex; justify-content:flex-end;">
+                        <button id="save-whiteboard-btn" class="btn-magenta-lg" onclick="window.saveWhiteboardNote()" style="padding:1rem 2.5rem; border-radius:12px;">Post Note</button>
+                    </div>
+                </div>
+
+                <div class="section-title">PERSISTENT ENTRIES</div>
+                <div id="whiteboard-notes-container" style="margin-bottom:4rem;">
+                    <!-- Notes injected by JS -->
+                </div>
+            </section>
+
             <!-- MY PROFILE PAGE -->
             <section id="profile" class="page">
                 <div class="banner-block">

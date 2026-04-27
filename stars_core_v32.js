@@ -94,6 +94,7 @@ window.showPage = function (pageId, el) {
     }
     if (pageId === 'messages') window.renderMessages(data.messages || []);
     if (pageId === 'resources') window.renderResources(data.resources || []);
+    if (pageId === 'whiteboard') window.renderWhiteboard();
 };
 
 window.logout = function () { StarsSession.clear(); location.reload(); };
@@ -206,7 +207,7 @@ window.trashResource = async (resId, btn) => {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${StarsSession.get().token}`
                 },
-                body: JSON.stringify({ resource_id: resId })
+                body: JSON.stringify({ id: resId })
             });
 
             // HARDENED HEARTBEAT: Log Status BEFORE parsing
@@ -225,10 +226,8 @@ window.trashResource = async (resId, btn) => {
                     setTimeout(() => card.remove(), 300);
                 }
                 
-                // DELAYED RELOAD: Ensure cloud propagation
-                setTimeout(() => {
-                    window.location.reload();
-                }, 800);
+                // NO PAGE RELOAD: Stay in Library view as requested
+                // console.log("✓ Resource deleted successfully (Local View Preserved)");
             } else {
                 alert("❌ Deletion failed: " + (data.error || 'Server error.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
@@ -414,6 +413,7 @@ async function initDashboard() {
             { id: 'survey', label: 'Survey Center', hideForMentees: true, hideForMentors: true },
             { id: 'sessions', label: 'My Sessions', hideForStaffOnly: true, hideForVisitors: true },
             { id: 'resources', label: 'Library' },
+            { id: 'whiteboard', label: 'Whiteboard' },
             { id: 'profile', label: 'My Profile' },
             { id: 'contact', label: 'Contact Us' },
             { id: 'settings', label: 'Settings' }
@@ -1533,26 +1533,25 @@ window.submitResourceUpload = async () => {
     logAPI('UPLOAD', '/api/resources/upload', 0, 'PENDING');
 
     try {
-        const payload = {
-            name,
-            description: desc,
-            category,
-            type,
-            url: '#'
-        };
+        const formData = new FormData();
+        formData.append('name', name);
+        formData.append('description', desc || "");
+        formData.append('category', category);
+        formData.append('type', type);
 
-        const urlInput = document.getElementById('res-upload-url');
-        if (urlInput && urlInput.value) {
-            payload.url = urlInput.value;
+        if (fileInput.files[0]) {
+            formData.append('file', fileInput.files[0]);
+        } else {
+            const urlVal = document.getElementById('res-upload-url')?.value;
+            if (urlVal) formData.append('url', urlVal);
         }
 
         const response = await fetch('/api/resources/upload', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${StarsSession.get().token}`
             },
-            body: JSON.stringify(payload)
+            body: formData
         });
 
         // HARDENED HEARTBEAT: Log BEFORE parsing to capture HTML errors
@@ -1564,7 +1563,9 @@ window.submitResourceUpload = async () => {
 
         if (data.success) {
             alert("✓ Resource posted successfully!");
-            window.location.reload();
+            if (window.closeResourceUpload) window.closeResourceUpload();
+            if (window.renderResources) window.renderResources();
+            else window.location.reload();
         } else {
             alert("❌ Upload failed: " + (data.error || "Server error"));
             if (btn) { btn.disabled = false; btn.textContent = "Confirm Upload"; }
@@ -1573,5 +1574,81 @@ window.submitResourceUpload = async () => {
         logAPI('UPLOAD', 'Connectivity Error', 500, 'FAILED');
         alert("❌ Upload failed. Check console.");
         if (btn) { btn.disabled = false; btn.textContent = "Confirm Upload"; }
+    }
+};
+// 15. WHITEBOARD SYSTEM
+window.renderWhiteboard = async function() {
+    const container = document.getElementById('whiteboard-notes-container');
+    if (!container) return;
+    
+    container.innerHTML = '<div style="padding:2rem; text-align:center; color:#94a3b8;">Syncing with cloud whiteboard...</div>';
+    
+    try {
+        const res = await fetch('/api/whiteboard', {
+            headers: { 'Authorization': `Bearer ${StarsSession.get().token}` }
+        });
+        const notes = await res.json();
+        
+        if (!notes || notes.length === 0) {
+            container.innerHTML = `
+                <div style="padding:4rem 2rem; text-align:center; background:#fff; border-radius:24px; border:2px dashed #f1f5f9;">
+                    <p style="color:#94a3b8; font-weight:600; margin:0;">No notes found. Create your first persistent note above!</p>
+                </div>`;
+            return;
+        }
+
+        const user = StarsSession.get().user;
+        const isMaster = user.role === 'ProgramStaff' || !!user.isCounselor;
+
+        container.innerHTML = notes.map(n => `
+            <div class="resource-card" style="margin-bottom:1.5rem; background:white; padding:1.5rem; border-radius:20px; border:1.5px solid #f1f5f9; position:relative;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
+                    <span style="font-size:0.65rem; font-weight:800; color:var(--stars-magenta); text-transform:uppercase; background:#fff1f6; padding:0.4rem 0.8rem; border-radius:8px;">
+                        ${n.category || 'General'}
+                    </span>
+                    <span style="font-size:0.7rem; color:#94a3b8; font-weight:600;">
+                        ${new Date(n.timestamp).toLocaleDateString()} ${new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    </span>
+                </div>
+                <p style="font-size:1rem; color:#1e293b; line-height:1.6; font-weight:500; margin-bottom:1rem;">${n.content}</p>
+                <div style="border-top:1px solid #f8fafc; padding-top:1rem; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="font-size:0.75rem; color:#64748b; font-weight:700;">
+                        ${isMaster ? `Author: <span style="color:var(--stars-magenta)">${n.created_by}</span>` : 'Stored Privately'}
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = `<div style="color:#ef4444; padding:1rem; font-weight:700;">Connectivity Error: ${e.message}</div>`;
+    }
+};
+
+window.saveWhiteboardNote = async function() {
+    const content = document.getElementById('whiteboard-input')?.value;
+    const btn = document.getElementById('save-whiteboard-btn');
+    if (!content) { alert("Please enter some content for your note."); return; }
+    
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving...'; }
+    
+    try {
+        const res = await fetch('/api/whiteboard', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${StarsSession.get().token}`
+            },
+            body: JSON.stringify({ content, category: 'General' })
+        });
+        const data = await res.json();
+        if (data.success) {
+            document.getElementById('whiteboard-input').value = '';
+            window.renderWhiteboard();
+        } else {
+            alert("❌ Save failed: " + (data.error || "Server error"));
+        }
+    } catch (e) {
+        alert("❌ Connectivity Error: " + e.message);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Post Note'; }
     }
 };

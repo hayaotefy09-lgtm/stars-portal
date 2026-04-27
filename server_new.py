@@ -1,215 +1,327 @@
-import http.server
-import socketserver
-import sqlite3
-import json
 import uuid
 import datetime
 import random
 import requests
-import urllib.parse
-from urllib.parse import urlparse, urlsplit, parse_qs
-from supabase import create_client, Client
-import openpyxl
 import os
-import threading
+import io
+import re
+import mimetypes
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+from supabase import create_client, Client
 
-print('Resend Integration (Requests) Ready')
-SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
+app = Flask(__name__)
+CORS(app)
+
+print('BARS Flask Cloud Server Initializing...')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://cojvbregrwqgnzscmmub.supabase.co")
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MjYxNDIsImV4cCI6MjA5MjUwMjE0Mn0.QCnDJtL7oYuvL8spFWaMWAxA6DG6u7lMid1a79yqYQI")
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjkyNjE0MiwiZXhwIjoyMDkyNTAyMTQyfQ.eRgflZH9Qy2EXIVkIAN0xd5tFf9mO2pM-Iqr8IFnv7s")
+
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-PORT = int(os.environ.get('PORT', 8000))
-DATABASE = 'stars.db'
-RESEND_API_KEY = os.environ.get('RESEND_API_KEY', 're_Y3YvChqy_8umddUdmRLsbs5ozou5wiKRC')
-
-OTP_STORE = {}
 SESSION_STORE = {}
 
-PROTECTED_EMAILS = [
-    'joshua.q@naischool.ae', 'nabeera.n@naischool.ae', 
-    'dummy.counselor@naischool.ae', 'hayaotefy09@gmail.com',
-    'admin@stars.ae', '514115@naischool.ae'
-]
-
-def init_db():
-    conn = sqlite3.connect(DATABASE); c = conn.cursor()
-    c.execute("CREATE TABLE IF NOT EXISTS Users (email TEXT PRIMARY KEY, first_name TEXT, last_name TEXT, password TEXT, role TEXT, title TEXT, bio TEXT, interests TEXT, isCounselor INTEGER DEFAULT 0)")
-    c.execute("CREATE TABLE IF NOT EXISTS MentorMenteePair (id INTEGER PRIMARY KEY AUTOINCREMENT, mentor_email TEXT, mentee_email TEXT, UNIQUE(mentor_email, mentee_email))")
-    c.execute("CREATE TABLE IF NOT EXISTS Messages (id INTEGER PRIMARY KEY AUTOINCREMENT, pair_id INTEGER, sender_email TEXT, message TEXT, timestamp TEXT)")
-    c.execute("CREATE TABLE IF NOT EXISTS Sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, pair_id INTEGER, start_time TEXT, meeting_link TEXT, scheduled_by TEXT, status TEXT DEFAULT 'Pending')")
-    c.execute("CREATE TABLE IF NOT EXISTS Resources (id TEXT PRIMARY KEY, name TEXT, type TEXT, size TEXT, uploaded_by TEXT, timestamp TEXT, description TEXT, category TEXT, url TEXT)")
-    c.execute("CREATE TABLE IF NOT EXISTS Surveys (id INTEGER PRIMARY KEY AUTOINCREMENT, user_email TEXT, question TEXT, answer TEXT, timestamp TEXT, survey_type TEXT, source_file TEXT)")
-    
-    # Absolute Seeding Restoration
-    seed = [
-        ('hayaotefy09@gmail.com', 'Haya', 'Otefy', 'pass', 'ProgramStaff', 1),
-        ('admin@stars.ae', 'System', 'Admin', 'STARS2026', 'ProgramStaff', 1),
-        ('514115@naischool.ae', 'Primary', 'Mentor', 'pass', 'Mentor', 1), # Seeding as counselor-privileged mentor
-        ('dummy.counselor@naischool.ae', 'Dummy', 'Counselor', 'pass', 'ProgramStaff', 1)
-    ]
-    for e, f, l, p, r, isc in seed:
-        c.execute("INSERT OR REPLACE INTO Users (email, first_name, last_name, password, role, isCounselor) VALUES (?,?,?,?,?,?)", (e.lower(), f, l, p, r, isc))
-    conn.commit(); conn.close()
-    
-    # TRIGGER AUTHORITATIVE SYNC
-    threading.Thread(target=full_sync_worker, daemon=True).start()
-
-def full_sync_worker():
-    """STARS v13.0: Authoritative Cloud Synchronization Engine"""
-    try:
-        print("STARS SYNC: Pulling authoritative data from Supabase...")
-        # 1. Profiles
-        res = supabase.table('profiles').select('*').execute()
-        if res.data:
-            conn = sqlite3.connect(DATABASE); c = conn.cursor()
-            for r in res.data:
-                c.execute("INSERT INTO Users (email, first_name, last_name, role, password) VALUES (?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET first_name=excluded.first_name", (r['email'], r.get('first_name'), r.get('last_name'), r.get('role', 'Mentee'), 'pass123'))
-            conn.commit(); conn.close()
-        
-        # 2. Pairings
-        res = supabase.table('mentor_mentee_pairs').select('*').execute()
-        if res.data:
-            conn = sqlite3.connect(DATABASE); c = conn.cursor()
-            for r in res.data:
-                c.execute("INSERT OR IGNORE INTO MentorMenteePair (mentor_email, mentee_email) VALUES (?,?)", (r['mentor_email'], r['mentee_email']))
-            conn.commit(); conn.close()
-
-        # 3. Resources
-        res = supabase.table('resources').select('*').execute()
-        if res.data:
-            conn = sqlite3.connect(DATABASE); c = conn.cursor()
-            for r in res.data:
-                c.execute("INSERT OR REPLACE INTO Resources (id, name, type, uploaded_by, timestamp) VALUES (?,?,?,?,?)", (str(r['id']), r.get('name'), r.get('type'), r.get('uploaded_by'), r.get('timestamp')))
-            conn.commit(); conn.close()
-        print("STARS SYNC: Operation successful.")
-    except Exception as e: print(f"STARS SYNC ERROR: {e}")
-
-def get_user_from_headers(headers):
-    if headers.get('X-Admin-Bypass') == 'STARS2026':
-        return {"email": "admin@stars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
-    auth = headers.get('Authorization')
+def get_user_from_headers():
+    if request.headers.get('X-Admin-Bypass') == 'BARS2026':
+        return {"email": "admin@bars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
+    auth = request.headers.get('Authorization')
     if auth and auth.startswith('Bearer '):
         token = auth.split(' ')[1]
         if token in SESSION_STORE: return SESSION_STORE[token]
     return None
 
-class STARSAPIHandler(http.server.SimpleHTTPRequestHandler):
-    def end_headers(self):
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type, X-Admin-Bypass')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DELETE')
-        super().end_headers()
+def safe_get(obj, keys, default=None):
+    for k in keys:
+        if k in obj and obj[k] is not None: return obj[k]
+    return default
 
-    def do_OPTIONS(self): self.send_response(200); self.end_headers()
+def normalize_role(role_str):
+    if not role_str: return "Mentee"
+    r = str(role_str).lower().strip()
+    if r in ['programstaff', 'counselor', 'admin', 'staff']: return "ProgramStaff"
+    if r in ['mentor']: return "Mentor"
+    return "Mentee"
 
-    def do_GET(self):
-        try:
-            path = self.path.split('?')[0].rstrip('/')
-            if path == '/api/initial-data':
-                self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-                self.wfile.write(b'{"status": "Online", "v": "13.0 Sync"}')
-            elif path == '/api/dashboard': self.handle_dashboard()
-            elif path == '/api/admin/data': self.handle_admin_data()
-            elif path == '/api/resources': self.handle_get_resources()
-            else: super().do_GET()
-        except Exception as e: self.send_error_json(500, str(e))
-
-    def handle_dashboard(self):
-        u = get_user_from_headers(self.headers)
-        if not u: self.send_error_json(401, "Auth Required"); return
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        res = {"pairs": [], "mentors": [], "sessions": [], "resources": [], "messages": []}
+def init_cloud_seed():
+    """Developer Seeding: Ensures the main Admin account exists in Supabase."""
+    print("[SEED]: Verifying Admin account...")
+    try:
+        admin_email = "admin@bars.ae"
+        found = False
+        for table in ['users', 'profiles', 'Registry']:
+            try:
+                res = supabase_admin.table(table).select('email').eq('email', admin_email).execute()
+                if res.data: found = True; break
+            except: continue
         
-        # 1. Global Registry (Names)
-        c.execute("SELECT first_name, last_name, email, role FROM Users")
-        for r in c.fetchall():
-            if r[3] == 'Mentor': res["mentors"].append({"name": f"{r[0]} {r[1]}", "email": r[2]})
+        if not found:
+            print(f"[SEED]: Admin {admin_email} not found. Creating authoritative entry...")
+            admin_data = {
+                "email": admin_email,
+                "full_name": "System Administrator",
+                "role": "ProgramStaff",
+                "password": "bars",
+                "bio": "System Root Account",
+                "interests": "Administration"
+            }
+            supabase_admin.table('users').insert(admin_data).execute()
+            print("[SEED]: Admin account created successfully.")
+        else:
+            print("[SEED]: Admin account verified.")
+    except Exception as e:
+        print(f"[SEED ERROR]: Cloud seeding failed: {str(e)}")
 
-        # 2. Pairings & Sessions
-        if u['role'] == 'ProgramStaff' or u.get('isCounselor'):
-            # COUNSELOR: See all pairings
-            c.execute("SELECT m.first_name, m.last_name, s.first_name, s.last_name, p.id FROM MentorMenteePair p JOIN Users m ON p.mentor_email=m.email JOIN Users s ON p.mentee_email=s.email")
-            for r in c.fetchall(): res["pairs"].append({"mentor_name": f"{r[0]} {r[1]}", "mentee_name": f"{r[2]} {r[3]}", "pair_id": r[4]})
-        elif u['role'] == 'Mentor':
-            c.execute("SELECT u.first_name, u.last_name, u.email, p.id FROM MentorMenteePair p JOIN Users u ON p.mentee_email = u.email WHERE p.mentor_email=?", (u['email'],))
-            for r in c.fetchall(): res["pairs"].append({"name": f"{r[0]} {r[1]}", "email": r[2], "pair_id": r[3], "type": "Mentee"})
+@app.route('/api/initial-data', methods=['GET'])
+def initial_data():
+    return jsonify({"status": "Online", "v": "141.0 Schema-Adaptive Restoration"})
+
+@app.route('/api/dashboard', methods=['GET'])
+def handle_dashboard():
+    try:
+        u = get_user_from_headers()
+        if not u: return jsonify({"error": "Auth Required"}), 401
+        res = {"pairs": [], "mentors": [], "sessions": [], "resources": [], "messages": [], "profile": {}}
         
-        c.execute("SELECT id, name, type FROM Resources")
-        for r in c.fetchall(): res["resources"].append({"id": r[0], "name": r[1], "type": r[2]})
-        conn.close()
-        self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(json.dumps(res).encode())
+        def safe_fetch(table_names, fallback_data=[]):
+            for name in table_names:
+                try:
+                    resp = supabase_admin.table(name).select('*').execute()
+                    if resp.data is not None: return resp.data
+                except: continue
+            return fallback_data
 
-    def handle_admin_data(self):
-        u = get_user_from_headers(self.headers)
-        if not u: self.send_error_json(403, "Access Denied"); return
-        res = {"users": [], "pairs": []}
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("SELECT email, first_name, last_name, role FROM Users")
-        for r in c.fetchall(): res["users"].append({"email": r[0], "name": f"{r[1]} {r[2]}", "role": r[3]})
-        c.execute("SELECT m.first_name, s.first_name, p.id FROM MentorMenteePair p JOIN Users m ON p.mentor_email=m.email JOIN Users s ON p.mentee_email=s.email")
-        for r in c.fetchall(): res["pairs"].append({"mentor": r[0], "mentee": r[1], "pair_id": r[2]})
-        conn.close()
-        self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(json.dumps(res).encode())
+        users_data = safe_fetch(['users', 'profiles', 'Registry', 'Staff'])
+        pairs_data = safe_fetch(['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings'])
+        sessions_data = safe_fetch(['sessions', 'Sessions', 'Events'])
+        resources_data = safe_fetch(['resources', 'Resources', 'Library'])
+        messages_data = safe_fetch(['messages', 'Messages', 'Chats'])
+        
+        users_map = {safe_get(r, ['email', 'user_email']): r for r in users_data} if users_data else {}
+        
+        def format_user_name(usr):
+            fn = safe_get(usr, ['full_name', 'name', 'displayName']) or f"{safe_get(usr, ['first_name', 'firstName'], '')} {safe_get(usr, ['last_name', 'lastName'], '')}".strip() or "Unnamed User"
+            parts = fn.split(' ', 1); f_name = parts[0] if len(parts) > 0 else fn; l_name = parts[1] if len(parts) > 1 else ""
+            return fn, f_name, l_name
 
-    def do_POST(self):
-        try:
-            cl = int(self.headers.get('Content-Length', 0))
-            data = json.loads(self.rfile.read(cl).decode('utf-8')) if cl > 0 else {}
-            path = self.path.split('?')[0].rstrip('/')
-            if path == '/api/login': self.handle_login(data)
-            elif path == '/api/register': self.handle_register(data)
-            elif path == '/api/admin/create': self.handle_admin_create(data)
-            elif path == '/api/admin/pair': self.handle_admin_pair(data)
-            elif path == '/api/delete-user': self.handle_delete_user(data)
-            elif path == '/api/verify-staff': self.handle_verify_staff(data)
-            elif path == '/api/resources/upload': self.handle_upload_resource(data)
-            else: self.send_error_json(404, "Endpoint Missing")
-        except Exception as e: self.send_error_json(500, str(e))
+        for email, usr in users_map.items():
+            if not email: continue
+            role = normalize_role(safe_get(usr, ['role', 'user_role']))
+            if role == 'Mentor':
+                fn, f_name, l_name = format_user_name(usr)
+                res["mentors"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": email, "bio": safe_get(usr, ['bio']), "interests": safe_get(usr, ['interests'])})
+        
+        for p in pairs_data:
+            m_email = safe_get(p, ['mentor_email', 'mentorEmail', 'mentor'])
+            s_email = safe_get(p, ['mentee_email', 'menteeEmail', 'mentee'])
+            if not m_email or not s_email: continue
+            p_id = safe_get(p, ['id', 'pair_id'])
+            
+            cur_role = normalize_role(u['role'])
+            if cur_role == 'Mentor' and m_email == u['email']:
+                uu = users_map.get(s_email, {})
+                fn, f_name, l_name = format_user_name(uu)
+                res["pairs"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": s_email, "pair_id": p_id, "type": "Mentee", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
+            elif cur_role == 'Mentee' and s_email == u['email']:
+                uu = users_map.get(m_email, {})
+                fn, f_name, l_name = format_user_name(uu)
+                res["pairs"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": m_email, "pair_id": p_id, "type": "Mentor", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
+            elif cur_role == 'ProgramStaff':
+                m = users_map.get(m_email, {}); s = users_map.get(s_email, {})
+                fn_m, _, _ = format_user_name(m); fn_s, _, _ = format_user_name(s)
+                res["pairs"].append({"mentor_name": fn_m, "mentee_name": fn_s, "pair_id": p_id, "mentor_email": m_email, "mentee_email": s_email})
+        
+        res["resources"] = resources_data
+        res["sessions"] = sessions_data
+        res["messages"] = messages_data 
+        fn_u, f_u, l_u = format_user_name(u)
+        is_c = normalize_role(u.get('role')) == 'ProgramStaff'
+        res["profile"] = {"name": fn_u, "first_name": f_u, "last_name": l_u, "email": u.get('email'), "role": u['role'], "isCounselor": is_c}
+        return jsonify(res)
+    except Exception as e: return jsonify({"error": f"Dashboard Error: {str(e)}"}), 500
 
-    def handle_login(self, data):
-        e, p = data.get('email', '').lower().strip(), data.get('password')
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("SELECT first_name, last_name, role, isCounselor FROM Users WHERE email=? AND password=?", (e,p))
-        r = c.fetchone(); conn.close()
-        if r:
-            user = {"email": e, "role": r[2], "name": f"{r[0]} {r[1]}", "isCounselor": bool(r[3])}
+@app.route('/api/login', methods=['POST'])
+def handle_login():
+    try:
+        data = request.get_json(); e, p = data.get('email', '').lower().strip(), data.get('password', '')
+        resp = None
+        for table in ['users', 'profiles', 'Registry', 'Staff']:
+            try:
+                r = supabase_admin.table(table).select('*').eq('email', e).eq('password', p).execute()
+                if r.data: resp = r; break
+            except: continue
+        if resp and resp.data:
+            r = resp.data[0]
+            fn = safe_get(r, ['full_name', 'name']) or f"{safe_get(r, ['first_name', 'firstName'], '')} {safe_get(r, ['last_name', 'lastName'], '')}".strip() or "User"
+            parts = fn.split(' ', 1); f_name = parts[0] if len(parts) > 0 else fn; l_name = parts[1] if len(parts) > 1 else ""
+            user = {"email": e, "role": safe_get(r, ['role', 'user_role']), "name": fn, "first_name": f_name, "last_name": l_name, "isCounselor": (normalize_role(safe_get(r, ['role'])) == 'ProgramStaff')}
             token = str(uuid.uuid4()); SESSION_STORE[token] = user
-            self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "token": token, "user": user}).encode())
-        else: self.send_error_json(401, "Invalid credentials")
+            return jsonify({"success": True, "token": token, "user": user})
+        return jsonify({"error": "Invalid credentials"}), 401
+    except Exception as e: return jsonify({"error": f"Login Error: {str(e)}"}), 500
 
-    def handle_register(self, data):
-        e, f, l, p, r = data.get('email').lower(), data.get('firstName'), data.get('lastName'), data.get('password'), data.get('role', 'Mentee')
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("INSERT OR REPLACE INTO Users (email, first_name, last_name, password, role) VALUES (?,?,?,?,?)", (e,f,l,p,r))
-        conn.commit(); conn.close()
-        self.send_response(200); self.end_headers(); self.wfile.write(b'{"success": True}')
+@app.route('/api/register', methods=['POST'])
+def register():
+    try:
+        data = request.get_json()
+        email, fn, ln, pw, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('password', ''), data.get('role', 'Mentee')
+        full_name = f"{fn} {ln}".strip()
+        supabase_admin.table('users').insert({"email": email, "full_name": full_name, "password": pw, "role": role, "bio": "", "interests": ""}).execute()
+        return jsonify({"status": "success", "message": "Account created! You can now log in."}), 200
+    except Exception as e: return jsonify({"status": "error", "message": str(e)}), 500
 
-    def handle_verify_staff(self, data):
-        e = data.get('email', '').lower()
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("SELECT first_name, last_name, password FROM Users WHERE email=? AND isCounselor=1", (e,))
-        r = c.fetchone(); conn.close()
-        if r:
-            self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "first_name": r[0], "is_activated": bool(r[2])}).encode())
-        else: self.send_error_json(404, "Staff not found")
+@app.route('/api/verify-staff', methods=['POST'])
+def handle_verify_staff():
+    data = request.get_json(); e = data.get('email', '').lower().strip()
+    resp = None
+    for table in ['users', 'profiles', 'Registry', 'Staff']:
+        try:
+            r = supabase_admin.table(table).select('*').eq('email', e).execute()
+            if r.data: resp = r; break
+        except: continue
+    if resp and resp.data:
+        r = resp.data[0]
+        is_active = r.get('password') is not None and r['password'].strip() not in ['PENDING_ACTIVATION', '', 'pass']
+        return jsonify({"success": True, "full_name": safe_get(r, ['full_name', 'name']), "is_activated": is_active})
+    return jsonify({"error": "Staff not found"}), 404
 
-    def handle_get_resources(self):
-        conn = sqlite3.connect(DATABASE); c = conn.cursor()
-        c.execute("SELECT id, name, type FROM Resources")
-        r = [{"id": x[0], "name": x[1], "type": x[2]} for x in c.fetchall()]; conn.close()
-        self.send_response(200); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(json.dumps(r).encode())
+@app.route('/api/activate-staff', methods=['POST'])
+def handle_activate_staff():
+    data = request.get_json(); e, p = data.get('email', '').lower().strip(), data.get('password', '')
+    supabase_admin.table('users').update({"password": p}).eq('email', e).execute()
+    return jsonify({"success": True})
 
-    def send_error_json(self, code, msg):
-        self.send_response(code); self.send_header('Content-Type','application/json'); self.end_headers()
-        self.wfile.write(json.dumps({"error": msg, "success": False}).encode())
+@app.route('/api/messages', methods=['GET', 'POST'])
+def handle_messages():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        if request.method == 'GET':
+            pid = request.args.get('pair_id')
+            q = None
+            for table in ['messages', 'Messages', 'Chats']:
+                try:
+                    q = supabase_admin.table(table).select('*')
+                    if pid: q = q.eq('pair_id', pid)
+                    resp = q.order('timestamp', desc=False).execute()
+                    if resp.data is not None:
+                        return jsonify([{"sender": safe_get(r, ['sender_email', 'sender']), "message": safe_get(r, ['message', 'text']), "time": safe_get(r, ['timestamp', 'time'])} for r in resp.data])
+                except: continue
+            return jsonify([]) # Fallback for missing table
+        else:
+            data = request.get_json(); pid, msg = data.get('pair_id'), data.get('message')
+            ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+            supabase_admin.table('messages').insert({"pair_id": pid, "sender_email": u['email'], "message": msg, "timestamp": ts}).execute()
+            return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/survey/analytics', methods=['GET'])
+def handle_survey_analytics():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        resp = supabase_admin.table('surveys').select('*').execute()
+        return jsonify({"surveys": resp.data or [], "trends": [{"survey": "Brotherhood", "score": 85}]})
+    except: return jsonify({"surveys": []}), 200
+
+@app.route('/api/whiteboard', methods=['GET', 'POST'])
+def handle_whiteboard():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        if request.method == 'GET':
+            # Role-Based Privacy: Counselor/Admin see all, others see only their own.
+            is_master = u.get('role') == 'ProgramStaff' or bool(u.get('isCounselor'))
+            q = supabase_admin.table('whiteboard').select('*')
+            if not is_master:
+                q = q.eq('created_by', u['email'])
+            resp = q.order('timestamp', desc=True).execute()
+            return jsonify(resp.data or [])
+        else:
+            data = request.get_json()
+            content = data.get('content')
+            ts = datetime.datetime.now().isoformat()
+            note = {
+                "id": str(uuid.uuid4())[:8],
+                "content": content,
+                "created_by": u['email'],
+                "timestamp": ts,
+                "category": data.get('category', 'General')
+            }
+            supabase_admin.table('whiteboard').insert(note).execute()
+            return jsonify({"success": True, "note": note})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/resources/upload', methods=['POST'])
+@app.route('/api/resources/upload-file', methods=['POST'])
+def handle_upload_resource_file():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        raw_body = request.get_data(); ct = request.headers.get('Content-Type', '')
+        if "boundary=" not in ct: return jsonify({"error": "Invalid Multipart Request"}), 400
+        boundary = b'--' + ct.split("boundary=")[1].encode()
+        parts = raw_body.split(boundary); form = {}
+        for p in parts:
+            if b'Content-Disposition' not in p: continue
+            head_end = p.find(b'\r\n\r\n'); head = p[:head_end].decode('utf-8', errors='ignore')
+            body = p[head_end+4:].rstrip(b'\r\n--').rstrip(b'\r\n')
+            name_match = re.search(r'name="([^"]+)"', head); file_match = re.search(r'filename="([^"]+)"', head)
+            if name_match:
+                n = name_match.group(1)
+                if file_match: form[n] = {'filename': file_match.group(1), 'content': body}
+                else: form[n] = body.decode('utf-8', errors='ignore')
+        if 'file' not in form: return jsonify({"error": "No file part"}), 400
+        file_item = form['file']; fn = f"{uuid.uuid4()}_{file_item['filename']}"
+        mime, _ = mimetypes.guess_type(file_item['filename'])
+        supabase_admin.storage.from_('resource-files').upload(path=fn, file=file_item['content'], file_options={"content-type": mime or 'application/octet-stream'})
+        url = supabase_admin.storage.from_('resource-files').get_public_url(fn)
+        supabase_admin.table('resources').insert({"id": str(uuid.uuid4())[:8], "name": form.get('name', file_item['filename']), "type": form.get('type', 'Document'), "uploaded_by": u['email'], "timestamp": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), "description": form.get('description', ''), "category": form.get('category', 'General'), "url": url}).execute()
+        return jsonify({"success": True, "url": url})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/resources/delete', methods=['POST'])
+def handle_resource_delete():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        data = request.get_json()
+        rid = data.get('id') or data.get('resource_id')
+        if not rid: return jsonify({"error": "Missing ID"}), 400
+        supabase_admin.table('resources').delete().eq('id', rid).execute()
+        return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sessions/delete', methods=['POST'])
+def handle_session_delete():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        data = request.get_json(); sid = data.get('id')
+        supabase_admin.table('sessions').delete().eq('id', sid).execute()
+        return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/delete-user', methods=['POST'])
+def handle_delete_user():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        data = request.get_json(); email = data.get('email')
+        supabase_admin.table('users').delete().eq('email', email).execute()
+        return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/')
+def serve_index(): return send_from_directory('.', 'index.html')
+@app.route('/admin.html')
+def serve_admin(): return send_from_directory('.', 'admin.html')
+@app.route('/<path:path>')
+def serve_static(path): return send_from_directory('.', path)
 
 if __name__ == "__main__":
-    init_db()
-    print(f"STARS Portal v13.0 Sync Restoration starting on port {PORT}...")
-    httpd = http.server.ThreadingHTTPServer(('', PORT), STARSAPIHandler)
-    httpd.serve_forever()
+    init_cloud_seed()
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host='0.0.0.0', port=port)
