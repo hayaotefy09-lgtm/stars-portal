@@ -13,10 +13,10 @@ from supabase import create_client, Client
 app = Flask(__name__)
 CORS(app)
 
-print('STARS Flask Cloud Server Initializing...')
-SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://cojvbregrwqgnzscmmub.supabase.co")
-SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MjYxNDIsImV4cCI6MjA5MjUwMjE0Mn0.QCnDJtL7oYuvL8spFWaMWAxA6DG6u7lMid1a79yqYQI")
-SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjkyNjE0MiwiZXhwIjoyMDkyNTAyMTQyfQ.eRgflZH9Qy2EXIVkIAN0xd5tFf9mO2pM-Iqr8IFnv7s")
+print('BARS Flask Cloud Server Initializing...')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://bprbhhygcmhlvwpsvmyz.supabase.co")
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.x5xZ_Hl9V_hV0Z6V_hV0Z6V_hV0Z6V_hV0Z6V_hV0Z6")
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -24,8 +24,8 @@ supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 SESSION_STORE = {}
 
 def get_user_from_headers():
-    if request.headers.get('X-Admin-Bypass') == 'STARS2026':
-        return {"email": "admin@stars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
+    if request.headers.get('X-Admin-Bypass') == 'BARS2026':
+        return {"email": "admin@bars.ae", "role": "ProgramStaff", "name": "System Admin", "isCounselor": True}
     auth = request.headers.get('Authorization')
     if auth and auth.startswith('Bearer '):
         token = auth.split(' ')[1]
@@ -48,7 +48,7 @@ def init_cloud_seed():
     """Developer Seeding: Ensures the main Admin account exists in Supabase."""
     print("[SEED]: Verifying Admin account...")
     try:
-        admin_email = "admin@stars.ae"
+        admin_email = "admin@bars.ae"
         found = False
         for table in ['users', 'profiles', 'Registry']:
             try:
@@ -62,7 +62,7 @@ def init_cloud_seed():
                 "email": admin_email,
                 "full_name": "System Administrator",
                 "role": "ProgramStaff",
-                "password": "pass",
+                "password": "bars",
                 "bio": "System Root Account",
                 "interests": "Administration"
             }
@@ -75,7 +75,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "141.0 Schema-Adaptive Restoration"})
+    return jsonify({"status": "Online", "v": "142.0 Whiteboard Restoration"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -208,11 +208,30 @@ def handle_messages():
                     if resp.data is not None:
                         return jsonify([{"sender": safe_get(r, ['sender_email', 'sender']), "message": safe_get(r, ['message', 'text']), "time": safe_get(r, ['timestamp', 'time'])} for r in resp.data])
                 except: continue
-            return jsonify([]) # Fallback for missing table
+            return jsonify([]) 
         else:
             data = request.get_json(); pid, msg = data.get('pair_id'), data.get('message')
             ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
             supabase_admin.table('messages').insert({"pair_id": pid, "sender_email": u['email'], "message": msg, "timestamp": ts}).execute()
+            return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/whiteboard', methods=['GET', 'POST'])
+def handle_whiteboard():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        if request.method == 'GET':
+            for table in ['whiteboard', 'Whiteboard', 'Notes']:
+                try:
+                    resp = supabase_admin.table(table).select('*').order('created_at', desc=True).execute()
+                    if resp.data is not None: return jsonify(resp.data)
+                except: continue
+            return jsonify([])
+        else:
+            data = request.get_json(); note = data.get('note')
+            if normalize_role(u['role']) != 'ProgramStaff': return jsonify({"error": "Unauthorized"}), 403
+            supabase_admin.table('whiteboard').insert({"email": u['email'], "note": note, "created_at": datetime.datetime.now().isoformat()}).execute()
             return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -224,35 +243,6 @@ def handle_survey_analytics():
         resp = supabase_admin.table('surveys').select('*').execute()
         return jsonify({"surveys": resp.data or [], "trends": [{"survey": "Brotherhood", "score": 85}]})
     except: return jsonify({"surveys": []}), 200
-
-@app.route('/api/whiteboard', methods=['GET', 'POST'])
-def handle_whiteboard():
-    u = get_user_from_headers()
-    if not u: return jsonify({"error": "Auth Required"}), 401
-    try:
-        if request.method == 'GET':
-            # Role-Based Privacy: Counselor/Admin see all, others see only their own.
-            is_master = u.get('role') == 'ProgramStaff' or bool(u.get('isCounselor'))
-            q = supabase_admin.table('whiteboard').select('*')
-            if not is_master:
-                q = q.eq('created_by', u['email'])
-            resp = q.order('timestamp', desc=True).execute()
-            return jsonify(resp.data or [])
-        else:
-            data = request.get_json()
-            content = data.get('content')
-            ts = datetime.datetime.now().isoformat()
-            note = {
-                "id": str(uuid.uuid4())[:8],
-                "content": content,
-                "created_by": u['email'],
-                "timestamp": ts,
-                "category": data.get('category', 'General')
-            }
-            supabase_admin.table('whiteboard').insert(note).execute()
-            return jsonify({"success": True, "note": note})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/resources/upload', methods=['POST'])
 @app.route('/api/resources/upload-file', methods=['POST'])
@@ -287,9 +277,7 @@ def handle_resource_delete():
     u = get_user_from_headers()
     if not u: return jsonify({"error": "Auth Required"}), 401
     try:
-        data = request.get_json()
-        rid = data.get('id') or data.get('resource_id')
-        if not rid: return jsonify({"error": "Missing ID"}), 400
+        data = request.get_json(); rid = data.get('resource_id')
         supabase_admin.table('resources').delete().eq('id', rid).execute()
         return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
