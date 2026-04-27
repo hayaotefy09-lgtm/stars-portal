@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "159.0 Aesthetics Master"})
+    return jsonify({"status": "Online", "v": "160.0 Full Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -351,10 +351,19 @@ def handle_upload_resource_file():
                 n = name_match.group(1)
                 if file_match: form[n] = {'filename': file_match.group(1), 'content': body}
                 else: form[n] = body.decode('utf-8', errors='ignore')
-        file_item = form['file']; fn = f"{uuid.uuid4()}_{file_item['filename']}"
-        mime, _ = mimetypes.guess_type(file_item['filename'])
+        if 'file' not in form: return jsonify({"error": "No file part"}), 400
+        file_item = form['file']
         
-        # CORRECT BUCKET: shared-resources
+        # KEY SANITIZATION (v160.0): Replace non-alphanumeric chars with underscores
+        raw_fn = file_item['filename']
+        ext = os.path.splitext(raw_fn)[1]
+        base = os.path.splitext(raw_fn)[0]
+        sanitized_base = re.sub(r'[^a-zA-Z0-9]', '_', base)
+        fn = f"{uuid.uuid4()}_{sanitized_base}{ext}"
+        
+        mime, _ = mimetypes.guess_type(fn)
+        
+        # Bucket Sync: shared-resources is the authoritative bucket for STARS
         supabase_admin.storage.from_('shared-resources').upload(path=fn, file=file_item['content'], file_options={"content-type": mime or 'application/octet-stream'})
         url = supabase_admin.storage.from_('shared-resources').get_public_url(fn)
         

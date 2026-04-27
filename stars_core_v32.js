@@ -1523,8 +1523,8 @@ window.triggerSurveyAlert = function (title, msg, link) {
 
 // 9. DIAGNOSTIC INFRASTRUCTURE (API Heartbeat Monitor)
 window.logAPI = (method, endpoint, status, message) => {
-    const overlay = document.getElementById('stars-api-diagnostic');
-    if (!overlay) return;
+    const logs = document.getElementById('hb-logs');
+    if (!logs) return;
     
     const entry = document.createElement('div');
     const color = status === 200 || status === 'success' ? '#10b981' : '#ef4444';
@@ -1536,30 +1536,54 @@ window.logAPI = (method, endpoint, status, message) => {
         </div>
         <div style="opacity: 0.7;">${message || ''}</div>
     `;
-    overlay.prepend(entry);
-    if (overlay.children.length > 5) overlay.lastChild.remove();
+    logs.prepend(entry);
+    if (logs.children.length > 5) logs.lastChild.remove();
 };
 
 window.initDiagnosticOverlay = () => {
     if (document.getElementById('stars-api-diagnostic')) return;
     const diag = document.createElement('div');
     diag.id = 'stars-api-diagnostic';
-    diag.style = "position:fixed; bottom:20px; right:20px; width:220px; max-height:300px; background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border:1px solid #e2e8f0; border-radius:12px; z-index:999999; padding:0.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); display:flex; flex-direction:column; overflow:hidden;";
-    diag.innerHTML = `<div style="font-size:10px; font-weight:800; color:#94a3b8; margin-bottom:0.5rem; text-transform:uppercase; letter-spacing:0.05em; display:flex; justify-content:space-between; align-items:center;">
-        API Heartbeat
-        <span style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
-    </div>`;
+    
+    const isMin = localStorage.getItem('stars_heartbeat_min') === 'true';
+    
+    diag.style = `position:fixed; bottom:20px; right:20px; ${isMin ? 'width:120px; height:32px;' : 'width:220px; max-height:300px;'} background:rgba(255,255,255,0.95); backdrop-filter:blur(10px); border:1px solid #e2e8f0; border-radius:12px; z-index:999999; padding:0.75rem; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); display:flex; flex-direction:column; overflow:hidden; transition: all 0.3s ease; cursor: pointer;`;
+    
+    diag.onclick = () => window.toggleDiagnostic();
+    
+    diag.innerHTML = `<div style="font-size:10px; font-weight:800; color:#94a3b8; text-transform:uppercase; letter-spacing:0.05em; display:flex; justify-content:space-between; align-items:center;">
+        <span id="hb-text">${isMin ? 'API ONLINE' : 'API Heartbeat'}</span>
+        <span id="hb-status" style="width:8px; height:8px; background:#10b981; border-radius:50%; display:inline-block;"></span>
+    </div>
+    <div id="hb-logs" style="display: ${isMin ? 'none' : 'block'};"></div>`;
+    
     document.body.appendChild(diag);
-    // Persistence Guard: If overlay is deleted, recreate it
+    
+    window.toggleDiagnostic = () => {
+        const el = document.getElementById('stars-api-diagnostic');
+        const logs = document.getElementById('hb-logs');
+        const text = document.getElementById('hb-text');
+        const min = el.style.width === '120px';
+        
+        if (min) {
+            el.style.width = '220px'; el.style.height = 'auto'; el.style.maxHeight = '300px';
+            logs.style.display = 'block'; text.innerText = 'API Heartbeat';
+            localStorage.setItem('stars_heartbeat_min', 'false');
+        } else {
+            el.style.width = '120px'; el.style.height = '32px'; el.style.maxHeight = '32px';
+            logs.style.display = 'none'; text.innerText = 'API ONLINE';
+            localStorage.setItem('stars_heartbeat_min', 'true');
+        }
+    };
+
     if (window.starsPersistenceTimer) clearInterval(window.starsPersistenceTimer);
     window.starsPersistenceTimer = setInterval(() => {
         if (!document.getElementById('stars-api-diagnostic')) {
-            console.warn("STARS: Heartbeat Overlay lost... Restoring.");
             window.initDiagnosticOverlay();
         }
     }, 2000);
 
-    logAPI('BOOT', 'System Online', 200, 'v146.0 Resilience Master');
+    logAPI('BOOT', 'System Online', 200, 'v160.0 Full Master');
 };
 
 // Initialize Diagnostics and restore handlers
