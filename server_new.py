@@ -32,7 +32,9 @@ def load_local_passwords():
             with open('local_users.json', 'r') as f:
                 users = json.load(f)
                 for u in users:
-                    PASSWORD_MAP[u['email'].lower().strip()] = u['password']
+                    e = u.get('email', '').lower().strip()
+                    p = u.get('password', 'pass').strip()
+                    if e: PASSWORD_MAP[e] = p
         # Authoritative Admin Fallback
         PASSWORD_MAP['admin@stars.ae'] = 'STARS2026'
         PASSWORD_MAP['programstaff@naischool.ae'] = 'pass'
@@ -100,7 +102,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "162.0 Resolution Master"})
+    return jsonify({"status": "Online", "v": "163.0 Auth Lockdown"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -153,7 +155,7 @@ def handle_dashboard():
         res["sessions"] = sessions_data
         res["messages"] = messages_data 
         fn_u, f_u, l_u = format_user_name(u)
-        is_c = normalize_role(u.get('role')) == 'ProgramStaff'
+        is_c = normalize_role(u.get('role')) in ['ProgramStaff', 'Counselor']
         res["profile"] = {"name": fn_u, "first_name": f_u, "last_name": l_u, "email": u.get('email'), "role": u['role'], "isCounselor": is_c}
         return jsonify(res)
     except Exception as e: return jsonify({"error": f"Dashboard Error: {str(e)}"}), 500
@@ -172,11 +174,12 @@ def handle_login():
         if resp and resp.data:
             r = resp.data[0]
             # VIRTUAL PASSWORD HANDSHAKE
-            db_pass = r.get('password') or PASSWORD_MAP.get(e)
+            db_pass = (r.get('password') or PASSWORD_MAP.get(e) or "").strip()
+            print(f"[AUTH DEBUG]: Trying {e} | Input: '{p}' | DB/Map: '{db_pass}'")
             if db_pass == p:
                 fn = safe_get(r, ['full_name', 'name']) or f"{safe_get(r, ['first_name', 'firstName'], '')} {safe_get(r, ['last_name', 'lastName'], '')}".strip() or "User"
                 parts = fn.split(' ', 1); f_name = parts[0] if len(parts) > 0 else fn; l_name = parts[1] if len(parts) > 1 else ""
-                user = {"email": e, "role": safe_get(r, ['role', 'user_role']), "name": fn, "first_name": f_name, "last_name": l_name, "isCounselor": (normalize_role(safe_get(r, ['role'])) == 'ProgramStaff')}
+                user = {"email": e, "role": safe_get(r, ['role', 'user_role']), "name": fn, "first_name": f_name, "last_name": l_name, "isCounselor": (normalize_role(safe_get(r, ['role'])) in ['ProgramStaff', 'Counselor'])}
                 token = str(uuid.uuid4()); SESSION_STORE[token] = user
                 return jsonify({"success": True, "token": token, "user": user})
         
