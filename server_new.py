@@ -100,9 +100,25 @@ def init_cloud_seed():
     except Exception as e:
         print(f"[SEED ERROR]: Cloud seeding failed: {str(e)}")
 
+@app.route('/api/admin/delete', methods=['DELETE', 'POST'])
+def handle_admin_delete():
+    if request.headers.get('X-Admin-Bypass') != 'STARS2026': return jsonify({"error": "Unauthorized"}), 401
+    try:
+        table = request.args.get('table')
+        rid = request.args.get('id')
+        if not table or not rid: return jsonify({"error": "Table/ID Missing"}), 400
+        
+        print(f"[ADMIN DELETE]: Removing record {rid} from {table}")
+        # Try both integer and string ID formats for maximum resilience
+        try: supabase_admin.table(table).delete().eq('id', int(rid)).execute()
+        except: supabase_admin.table(table).delete().eq('id', rid).execute()
+        
+        return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "165.0 Restoration Master"})
+    return jsonify({"status": "Online", "v": "166.0 Hard Delete Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():

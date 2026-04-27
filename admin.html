@@ -648,7 +648,7 @@
                 "Dissolve Pairing?",
                 "Are you sure you want to remove this mentor-mentee link?",
                 async () => {
-                    await fetch(`${API_URL}/api/hard-delete?table=mentor_mentee_pairs&id=${id}`, { method: 'DELETE', headers: { 'X-Admin-Bypass': 'STARS2026' } });
+                    await fetch(`${API_URL}/api/admin/delete?table=mentor_mentee_pairs&id=${id}`, { method: 'DELETE', headers: { 'X-Admin-Bypass': 'STARS2026' } });
                     loadData();
                 }
             );
