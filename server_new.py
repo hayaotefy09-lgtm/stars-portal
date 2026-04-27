@@ -276,21 +276,39 @@ def handle_whiteboard():
     u = get_user_from_headers()
     if not u: return jsonify({"error": "Auth Required"}), 401
     try:
+        role = normalize_role(u['role'])
         if request.method == 'GET':
             for table in ['whiteboard', 'Whiteboard', 'Notes']:
                 try:
-                    resp = supabase_admin.table(table).select('*').order('created_at', desc=True).execute()
-                    if resp.data is not None: return jsonify(resp.data)
+                    query = supabase_admin.table(table).select('*')
+                    if role == 'Mentor':
+                        query = query.eq('created_by', u['email'])
+                    
+                    resp = query.order('timestamp', desc=True).execute()
+                    if resp.data is not None:
+                        # Ensure fields match JS expectations
+                        formatted = []
+                        for n in resp.data:
+                            formatted.append({
+                                "id": n.get('id'),
+                                "content": n.get('content', n.get('note', '')),
+                                "timestamp": n.get('timestamp', n.get('created_at', '')),
+                                "created_by": n.get('created_by', n.get('mentor_email', '')),
+                                "category": n.get('category', 'Session Note')
+                            })
+                        return jsonify(formatted)
                 except: continue
             return jsonify([])
         else:
+            if role != 'Mentor': return jsonify({"error": "Only Mentors can post whiteboard notes."}), 403
             data = request.get_json(); note = data.get('note')
-            if normalize_role(u['role']) != 'ProgramStaff': return jsonify({"error": "Unauthorized"}), 403
+            if not note: return jsonify({"error": "Note content required"}), 400
+            
             supabase_admin.table('whiteboard').insert({
-                "mentor_name": u['name'],
-                "mentor_email": u['email'],
-                "note": note,
-                "created_at": datetime.datetime.now().isoformat()
+                "created_by": u['email'],
+                "content": note,
+                "timestamp": datetime.datetime.now().isoformat(),
+                "category": "Session Note"
             }).execute()
             return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
