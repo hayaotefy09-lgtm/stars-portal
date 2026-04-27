@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "153.0 Library Hardened"})
+    return jsonify({"status": "Online", "v": "155.0 Full Resilience Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -395,8 +395,15 @@ def handle_session_delete():
     if not u: return jsonify({"error": "Auth Required"}), 401
     try:
         data = request.get_json(); sid = data.get('id')
-        supabase_admin.table('sessions').delete().eq('id', sid).execute()
-        return jsonify({"success": True})
+        if not sid: return jsonify({"error": "Session ID required"}), 400
+        
+        # SCHEMA FALLBACK
+        for table in ['sessions', 'Sessions', 'Events', 'Pairings']:
+            try:
+                supabase_admin.table(table).delete().eq('id', sid).execute()
+                return jsonify({"success": True})
+            except: continue
+        return jsonify({"error": "Could not find session to delete"}), 404
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/delete-user', methods=['POST'])
@@ -405,8 +412,15 @@ def handle_delete_user():
     if not u: return jsonify({"error": "Auth Required"}), 401
     try:
         data = request.get_json(); email = data.get('email')
-        supabase_admin.table('users').delete().eq('email', email).execute()
-        return jsonify({"success": True})
+        if not email: return jsonify({"error": "Email required"}), 400
+        
+        # SCHEMA FALLBACK: STARS uses 'profiles' primarily
+        for table in ['profiles', 'users', 'Registry', 'Staff']:
+            try:
+                supabase_admin.table(table).delete().eq('email', email).execute()
+                return jsonify({"success": True})
+            except: continue
+        return jsonify({"error": "Could not find user to delete"}), 404
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/')
