@@ -1692,9 +1692,10 @@ window.renderWhiteboard = async function() {
         }
 
         const user = StarsSession.get().user;
-        const isStaff = user.role === 'ProgramStaff' || !!user.isCounselor || !!user.is_counselor;
+        const role = user.role?.toLowerCase() || '';
+        const isStaff = role.includes('staff') || role.includes('counselor') || !!user.isCounselor || !!user.is_counselor;
 
-        // HIDE POST BOX FOR NON-MENTORS (Staff see all, but don't post)
+        // HIDE POST BOX FOR NON-MENTORS (Staff/Counselors see all, but don't post)
         const postBox = document.getElementById('whiteboard-input-card');
         if (postBox) {
             postBox.style.setProperty('display', isStaff ? 'none' : 'block', 'important');
