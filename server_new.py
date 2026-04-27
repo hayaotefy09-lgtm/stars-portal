@@ -14,9 +14,9 @@ app = Flask(__name__)
 CORS(app)
 
 print('BARS Flask Cloud Server Initializing...')
-SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://bprbhhygcmhlvwpsvmyz.supabase.co")
-SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.x5xZ_Hl9V_hV0Z6V_hV0Z6V_hV0Z6V_hV0Z6V_hV0Z6")
-SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I")
+SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://cojvbregrwqgnzscmmub.supabase.co")
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MjYxNDIsImV4cCI6MjA5MjUwMjE0Mn0.QCnDJtL7oYuvL8spFWaMWAxA6DG6u7lMid1a79yqYQI")
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjkyNjE0MiwiZXhwIjoyMDkyNTAyMTQyfQ.eRgflZH9Qy2EXIVkIAN0xd5tFf9mO2pM-Iqr8IFnv7s")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -75,7 +75,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "142.0 Whiteboard Restoration"})
+    return jsonify({"status": "Online", "v": "143.0 Registry Restoration"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -161,6 +161,29 @@ def handle_login():
         return jsonify({"error": "Invalid credentials"}), 401
     except Exception as e: return jsonify({"error": f"Login Error: {str(e)}"}), 500
 
+@app.route('/api/admin/data', methods=['GET'])
+def admin_data():
+    if request.headers.get('X-Admin-Bypass') != 'BARS2026': return jsonify({"error": "Unauthorized"}), 401
+    try:
+        users = supabase_admin.table('users').select('*').execute().data or []
+        pairs = supabase_admin.table('mentor_mentee_pairs').select('*').execute().data or []
+        # Support fallback tables if main is empty
+        if not users: users = supabase_admin.table('Registry').select('*').execute().data or []
+        if not pairs: pairs = supabase_admin.table('Pairings').select('*').execute().data or []
+        return jsonify({"users": users, "pairs": pairs, "profiles": users})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/create', methods=['POST'])
+def admin_create():
+    if request.headers.get('X-Admin-Bypass') != 'BARS2026': return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        email, fn, ln, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('role', 'Mentee')
+        full_name = f"{fn} {ln}".strip()
+        supabase_admin.table('users').insert({"email": email, "full_name": full_name, "role": role, "password": "bars"}).execute()
+        return jsonify({"success": True})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
@@ -231,7 +254,12 @@ def handle_whiteboard():
         else:
             data = request.get_json(); note = data.get('note')
             if normalize_role(u['role']) != 'ProgramStaff': return jsonify({"error": "Unauthorized"}), 403
-            supabase_admin.table('whiteboard').insert({"email": u['email'], "note": note, "created_at": datetime.datetime.now().isoformat()}).execute()
+            supabase_admin.table('whiteboard').insert({
+                "mentor_name": u['name'],
+                "mentor_email": u['email'],
+                "note": note,
+                "created_at": datetime.datetime.now().isoformat()
+            }).execute()
             return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
