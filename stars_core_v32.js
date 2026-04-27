@@ -95,9 +95,52 @@ window.showPage = function (pageId, el) {
     if (pageId === 'messages') window.renderMessages(data.messages || []);
     if (pageId === 'resources') window.renderResources(data.resources || []);
     if (pageId === 'whiteboard') window.renderWhiteboard();
+    if (pageId === 'profile') window.renderProfile();
+    if (pageId === 'settings') window.loadSettings();
 };
 
 window.logout = function () { StarsSession.clear(); location.reload(); };
+
+window.renderProfile = function() {
+    const user = StarsSession.get()?.user;
+    if (!user) return;
+    const fname = document.getElementById('prof-fname');
+    const lname = document.getElementById('prof-lname');
+    const email = document.getElementById('prof-email');
+    
+    if (fname) fname.innerText = user.first_name || user.name?.split(' ')[0] || 'User';
+    if (lname) lname.innerText = user.last_name || user.name?.split(' ')[1] || '';
+    if (email) email.innerText = user.email || '';
+};
+
+window.toggleSetting = function(el, key) {
+    el.classList.toggle('active');
+    const isActive = el.classList.contains('active');
+    log(`Setting '${key}' toggled: ${isActive}`);
+};
+
+window.saveSettings = function() {
+    const settings = {
+        master: document.getElementById('toggle-master')?.classList.contains('active'),
+        resources: document.getElementById('toggle-resources')?.classList.contains('active'),
+        sessions: document.getElementById('toggle-sessions')?.classList.contains('active'),
+        messages: document.getElementById('toggle-messages')?.classList.contains('active')
+    };
+    localStorage.setItem('stars_settings', JSON.stringify(settings));
+    alert("✓ Settings saved successfully!");
+};
+
+window.loadSettings = function() {
+    try {
+        const stored = localStorage.getItem('stars_settings');
+        if (!stored) return;
+        const settings = JSON.parse(stored);
+        if (settings.master) document.getElementById('toggle-master')?.classList.add('active');
+        if (settings.resources) document.getElementById('toggle-resources')?.classList.add('active');
+        if (settings.sessions) document.getElementById('toggle-sessions')?.classList.add('active');
+        if (settings.messages) document.getElementById('toggle-messages')?.classList.add('active');
+    } catch (e) { log("Failed to load settings."); }
+};
 
 // 3. NUCLEAR MANAGEMENT HANDLERS (Consolidated Custom Modal Confirmation)
 window.starsConfirm = function (msg, onConfirm) {
@@ -1595,7 +1638,7 @@ window.submitResourceUpload = async () => {
         if (btn) { btn.disabled = false; btn.textContent = "Confirm Upload"; }
     }
 };
-// 15. WHITEBOARD SYSTEM
+
 window.renderWhiteboard = async function() {
     const container = document.getElementById('whiteboard-notes-container');
     if (!container) return;
@@ -1608,7 +1651,15 @@ window.renderWhiteboard = async function() {
         });
         const notes = await res.json();
         
-        if (!notes || notes.length === 0) {
+        if (notes.error || !Array.isArray(notes)) {
+            container.innerHTML = `
+                <div style="padding:4rem 2rem; text-align:center; background:#fff; border-radius:24px; border:2px dashed #f1f5f9;">
+                    <p style="color:#e84393; font-weight:600; margin:0;">${notes.error || 'Unable to load notes.'}</p>
+                </div>`;
+            return;
+        }
+
+        if (notes.length === 0) {
             container.innerHTML = `
                 <div style="padding:4rem 2rem; text-align:center; background:#fff; border-radius:24px; border:2px dashed #f1f5f9;">
                     <p style="color:#94a3b8; font-weight:600; margin:0;">No notes found. Create your first persistent note above!</p>
@@ -1625,26 +1676,29 @@ window.renderWhiteboard = async function() {
             postBox.style.setProperty('display', isStaff ? 'none' : 'block', 'important');
         }
 
-        container.innerHTML = notes.map(n => `
+        container.innerHTML = notes.map(n => {
+           const dateStr = n.timestamp ? new Date(n.timestamp).toLocaleDateString() : 'N/A';
+           const timeStr = n.timestamp ? new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '';
+           return `
             <div class="resource-card" style="margin-bottom:1.5rem; background:white; padding:1.5rem; border-radius:20px; border:1.5px solid #f1f5f9; position:relative;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
                     <span style="font-size:0.65rem; font-weight:800; color:var(--stars-magenta); text-transform:uppercase; background:#fff1f6; padding:0.4rem 0.8rem; border-radius:8px;">
-                        ${n.category || 'General'}
+                        ${n.category || 'Session Note'}
                     </span>
                     <span style="font-size:0.7rem; color:#94a3b8; font-weight:600;">
-                        ${new Date(n.timestamp).toLocaleDateString()} ${new Date(n.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        ${dateStr} ${timeStr}
                     </span>
                 </div>
                 <p style="font-size:1rem; color:#1e293b; line-height:1.6; font-weight:500; margin-bottom:1rem;">${n.content}</p>
                 <div style="border-top:1px solid #f8fafc; padding-top:1rem; display:flex; justify-content:space-between; align-items:center;">
                     <div style="font-size:0.75rem; color:#64748b; font-weight:700;">
-                        ${isMaster ? `Author: <span style="color:var(--stars-magenta)">${n.created_by}</span>` : 'Stored Privately'}
+                        Author: <span style="color:var(--stars-magenta)">${isStaff ? (n.mentor_name ? `${n.mentor_name} (${n.created_by})` : n.created_by) : 'Stored Privately'}</span>
                     </div>
                 </div>
             </div>
-        `).join('');
+        `}).join('');
     } catch (e) {
-        container.innerHTML = `<div style="color:#ef4444; padding:1rem; font-weight:700;">Connectivity Error: ${e.message}</div>`;
+        container.innerHTML = `<p style="color:#e84393; text-align:center;">Connectivity Error: ${e.message}</p>`;
     }
 };
 

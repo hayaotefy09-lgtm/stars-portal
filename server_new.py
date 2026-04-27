@@ -100,7 +100,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "156.0 Staff Lockdown"})
+    return jsonify({"status": "Online", "v": "159.0 Aesthetics Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -185,16 +185,26 @@ def handle_login():
 
 @app.route('/api/admin/data', methods=['GET'])
 def admin_data():
-    if request.headers.get('X-Admin-Bypass') != 'BARS2026': return jsonify({"error": "Unauthorized"}), 401
+    if request.headers.get('X-Admin-Bypass') != 'STARS2026': return jsonify({"error": "Unauthorized"}), 401
     try:
-        users = safe_fetch(['users', 'profiles', 'Registry', 'Staff'])
-        pairs = safe_fetch(['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings'])
-        return jsonify({"users": users, "pairs": pairs, "profiles": users})
+        users = []; pairs = []
+        # SCHEMA FALLBACK: Try all common tables
+        for table in ['profiles', 'users', 'Registry', 'Staff']:
+            try:
+                res = supabase_admin.table(table).select('*').execute()
+                if res.data: users = res.data; break
+            except: continue
+        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'Pairings']:
+            try:
+                res = supabase_admin.table(table).select('*').execute()
+                if res.data: pairs = res.data; break
+            except: continue
+        return jsonify({"users": users, "pairs": pairs})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/create', methods=['POST'])
 def admin_create():
-    if request.headers.get('X-Admin-Bypass') != 'BARS2026': return jsonify({"error": "Unauthorized"}), 401
+    if request.headers.get('X-Admin-Bypass') != 'STARS2026': return jsonify({"error": "Unauthorized"}), 401
     try:
         data = request.get_json()
         email, fn, ln, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('role', 'Mentee')
