@@ -482,12 +482,20 @@
             location.reload();
         }
 
+        function resolveUserName(u) {
+            return (u.full_name || u.name || u.displayName || 
+                   (u.first_name ? `${u.first_name} ${u.last_name || ''}` : '') || 
+                   (u.firstName ? `${u.firstName} ${u.lastName || ''}` : '') || 
+                   'Unknown User').trim();
+        }
+
         function filterUsers() {
             const query = document.getElementById('admin-user-search').value.toLowerCase();
-            const filtered = allUsers.filter(u =>
-                (u.name || '').toLowerCase().includes(query) ||
-                (u.email || '').toLowerCase().includes(query)
-            );
+            const filtered = allUsers.filter(u => {
+                const name = resolveUserName(u).toLowerCase();
+                const email = (u.email || '').toLowerCase();
+                return name.includes(query) || email.includes(query);
+            });
             renderUsersTable(filtered);
         }
 
@@ -495,7 +503,9 @@
             const query = document.getElementById('admin-pair-search').value.toLowerCase();
             const filtered = allPairs.filter(p =>
                 (p.mentor || '').toLowerCase().includes(query) ||
-                (p.mentee || '').toLowerCase().includes(query)
+                (p.mentee || '').toLowerCase().includes(query) ||
+                (p.mentor_email || '').toLowerCase().includes(query) ||
+                (p.mentee_email || '').toLowerCase().includes(query)
             );
             renderPairsTable(filtered);
         }
@@ -505,12 +515,7 @@
             users.forEach(u => {
                 const role = u.role || 'Mentee';
                 const p = (role === 'Mentor') ? 'mentor' : ((role === 'ProgramStaff' || role === 'Counselor') ? 'staff' : 'mentee');
-                
-                // Name Resolution Master Logic
-                const name = (u.full_name || u.name || u.displayName || 
-                           (u.first_name ? `${u.first_name} ${u.last_name || ''}` : '') || 
-                           (u.firstName ? `${u.firstName} ${u.lastName || ''}` : '') || 
-                           'Unknown User').trim();
+                const name = resolveUserName(u);
                 
                 uHTML += `<tr>
                     <td><span class="pill ${p}">${role}</span></td>
@@ -525,9 +530,11 @@
         function renderPairsTable(pairs) {
             let pHTML = '';
             pairs.forEach(p => {
-                pHTML += `<tr><td>${p.mentor}</td><td>${p.mentee}</td><td><button type="button" class="btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="deletePair(event, '${p.pair_id}')">Unpair</button></td></tr>`;
+                const m = p.mentor_name || p.mentor || p.mentor_email || 'N/A';
+                const s = p.mentee_name || p.mentee || p.mentee_email || 'N/A';
+                pHTML += `<tr><td>${m}</td><td>${s}</td><td><button type="button" class="btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; border-radius: 4px;" onclick="deletePair(event, '${p.pair_id || p.id}')">Unpair</button></td></tr>`;
             });
-            document.getElementById('pairs-body').innerHTML = pHTML || '<tr><td colspan="3">No active pairings found.</td></tr>';
+            document.getElementById('pairs-body').innerHTML = pHTML || '<tr><td colspan="3" style="text-align:center; padding:3rem; color:#94a3b8;">No active pairings found.</td></tr>';
         }
 
         async function loadData() {
@@ -536,10 +543,9 @@
                 const res = await fetch(`${API_URL}/api/admin/data`, { headers: { 'X-Admin-Bypass': 'STARS2026' } });
                 const data = await res.json();
                 allUsers = data.users || [];
-                const localPairs = data.pairs || [];
+                allPairs = data.pairs || [];
 
                 renderUsersTable(allUsers);
-                allPairs = data.pairs || [];
                 renderPairsTable(allPairs);
 
                 let mOpts = '<option value="">-- Choose Mentor --</option>';

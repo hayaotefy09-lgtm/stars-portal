@@ -1588,20 +1588,32 @@ window.initDiagnosticOverlay = () => {
 
 // Initialize Diagnostics and restore handlers
 document.addEventListener('DOMContentLoaded', () => {
-    // Heartbeat Monitor: Always initialize if on a portal/staff page
-    if (window.location.hash.includes('staff') || window.location.hash.includes('dashboard') || window.location.hash.includes('portal') || !!StarsSession.get().token) {
-        setTimeout(initDiagnosticOverlay, 500);
-    }
+    // Heartbeat Monitor: Always initialize if session exists or on portal/staff page
+    const checkDiag = () => {
+        if (!document.getElementById('stars-api-diagnostic')) {
+            const hasSession = !!StarsSession.get()?.token;
+            const isPortal = window.location.hash.includes('staff') || window.location.hash.includes('dashboard') || window.location.hash.includes('portal') || window.location.pathname.includes('admin.html');
+            if (hasSession || isPortal) {
+                window.initDiagnosticOverlay();
+            }
+        }
+    };
+    
+    setTimeout(checkDiag, 500);
+    setInterval(checkDiag, 5000);
     
     // Global Privilege Guard for Whiteboard
     const observer = new MutationObserver(() => {
         const postBox = document.getElementById('whiteboard-input-card');
         if (postBox) {
-            const user = StarsSession.get().user;
+            const user = StarsSession.get()?.user;
             if (user) {
                 const role = (user.role || '').toLowerCase();
                 const isStaff = role.includes('staff') || role.includes('counselor') || !!user.isCounselor || !!user.is_counselor;
-                if (isStaff) postBox.style.setProperty('display', 'none', 'important');
+                if (isStaff) {
+                    postBox.style.setProperty('display', 'none', 'important');
+                    console.log("WHITEBOARD_GUARD: Authoritatively hiding post box for staff role.");
+                }
             }
         }
     });
