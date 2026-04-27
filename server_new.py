@@ -13,10 +13,10 @@ from supabase import create_client, Client
 app = Flask(__name__)
 CORS(app)
 
-print('STARS Flask Cloud Server Initializing...')
-SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://bprbhygcmhlvwpsvmyzt.supabase.co")
-SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4")
-SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I")
+print('BARS Flask Cloud Server Initializing...')
+SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://cojvbregrwqgnzscmmub.supabase.co")
+SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5MjYxNDIsImV4cCI6MjA5MjUwMjE0Mn0.QCnDJtL7oYuvL8spFWaMWAxA6DG6u7lMid1a79yqYQI")
+SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNvanZicmVncndxZ256c2NtbXViIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NjkyNjE0MiwiZXhwIjoyMDkyNTAyMTQyfQ.eRgflZH9Qy2EXIVkIAN0xd5tFf9mO2pM-Iqr8IFnv7s")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 supabase_admin: Client = create_client(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -43,6 +43,14 @@ def normalize_role(role_str):
     if r in ['programstaff', 'counselor', 'admin', 'staff']: return "ProgramStaff"
     if r in ['mentor']: return "Mentor"
     return "Mentee"
+
+def safe_fetch(table_names, fallback_data=[]):
+    for name in table_names:
+        try:
+            resp = supabase_admin.table(name).select('*').execute()
+            if resp.data is not None: return resp.data
+        except: continue
+    return fallback_data
 
 def init_cloud_seed():
     """Developer Seeding: Ensures the main Admin account exists in Supabase."""
@@ -75,7 +83,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "145.0 DNS-Restored"})
+    return jsonify({"status": "Online", "v": "144.0 Admin Resilience"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -84,14 +92,6 @@ def handle_dashboard():
         if not u: return jsonify({"error": "Auth Required"}), 401
         res = {"pairs": [], "mentors": [], "sessions": [], "resources": [], "messages": [], "profile": {}}
         
-        def safe_fetch(table_names, fallback_data=[]):
-            for name in table_names:
-                try:
-                    resp = supabase_admin.table(name).select('*').execute()
-                    if resp.data is not None: return resp.data
-                except: continue
-            return fallback_data
-
         users_data = safe_fetch(['users', 'profiles', 'Registry', 'Staff'])
         pairs_data = safe_fetch(['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings'])
         sessions_data = safe_fetch(['sessions', 'Sessions', 'Events'])
@@ -165,11 +165,8 @@ def handle_login():
 def admin_data():
     if request.headers.get('X-Admin-Bypass') != 'BARS2026': return jsonify({"error": "Unauthorized"}), 401
     try:
-        users = supabase_admin.table('users').select('*').execute().data or []
-        pairs = supabase_admin.table('mentor_mentee_pairs').select('*').execute().data or []
-        # Support fallback tables if main is empty
-        if not users: users = supabase_admin.table('Registry').select('*').execute().data or []
-        if not pairs: pairs = supabase_admin.table('Pairings').select('*').execute().data or []
+        users = safe_fetch(['users', 'profiles', 'Registry', 'Staff'])
+        pairs = safe_fetch(['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings'])
         return jsonify({"users": users, "pairs": pairs, "profiles": users})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
@@ -205,7 +202,7 @@ def handle_verify_staff():
         except: continue
     if resp and resp.data:
         r = resp.data[0]
-        is_active = r.get('password') is not None and r['password'].strip() not in ['PENDING_ACTIVATION', '', 'pass']
+        is_active = r.get('password') is not None and r['password'].strip() not in ['PENDING_ACTIVATION', '']
         return jsonify({"success": True, "full_name": safe_get(r, ['full_name', 'name']), "is_activated": is_active})
     return jsonify({"error": "Staff not found"}), 404
 

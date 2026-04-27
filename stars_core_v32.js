@@ -329,18 +329,37 @@ window.handleStaffActivate = async function (event) {
     if (event) event.preventDefault();
     const pass = document.getElementById('staff-activate-pass').value;
     const confirm = document.getElementById('staff-activate-confirm').value;
+    const errorEl = document.getElementById('staff-activate-error');
     if (pass !== confirm) return alert("Passwords do not match.");
+    if (pass.length < 4) return alert("Password must be at least 4 characters.");
+
+    const email = window.STAFF_ACTIVATING_EMAIL;
+    log(`Activating account for ${email}...`);
+
     try {
+        // STEP 1: Activate account in DB
+        const actRes = await fetch('/api/activate-staff', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: pass })
+        });
+        if (!actRes.ok) throw new Error("Activation failed.");
+
+        // STEP 2: Login with the new password
         const res = await fetch('/api/login', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: window.STAFF_ACTIVATING_EMAIL, password: pass })
+            body: JSON.stringify({ email, password: pass })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+        if (!res.ok) throw new Error(data.error || "Login failed after activation.");
+
         StarsSession.save(data.token, data.user);
         window.showAuthForm('dash');
-    } catch (err) { alert(err.message); }
+    } catch (err) { 
+        if (errorEl) { errorEl.textContent = err.message; errorEl.style.display = 'block'; }
+        else alert(err.message); 
+    }
 };
 
 window.verifyVisitorOTP = async function () {
@@ -1497,7 +1516,7 @@ window.initDiagnosticOverlay = () => {
         }
     }, 2000);
 
-    logAPI('BOOT', 'System Online', 200, 'v9.0 Foundation Ready');
+    logAPI('BOOT', 'System Online', 200, 'v146.0 Resilience Master');
 };
 
 // Initialize Diagnostics and restore handlers
