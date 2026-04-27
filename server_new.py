@@ -83,7 +83,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "144.0 Admin Resilience"})
+    return jsonify({"status": "Online", "v": "147.0 Debug-Hardened"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -194,16 +194,21 @@ def register():
 @app.route('/api/verify-staff', methods=['POST'])
 def handle_verify_staff():
     data = request.get_json(); e = data.get('email', '').lower().strip()
-    resp = None
+    print(f"[VERIFY]: Checking email '{e}' in tables...")
     for table in ['users', 'profiles', 'Registry', 'Staff']:
         try:
             r = supabase_admin.table(table).select('*').eq('email', e).execute()
+            print(f"[VERIFY]: Table '{table}' result: {len(r.data) if r.data else 0} records found.")
             if r.data: resp = r; break
-        except: continue
+        except Exception as ex:
+            print(f"[VERIFY]: Table '{table}' error: {str(ex)}")
+            continue
     if resp and resp.data:
         r = resp.data[0]
+        print(f"[VERIFY]: User found. Password field: {'YES' if 'password' in r else 'NO'}")
         is_active = r.get('password') is not None and r['password'].strip() not in ['PENDING_ACTIVATION', '']
-        return jsonify({"success": True, "full_name": safe_get(r, ['full_name', 'name']), "is_activated": is_active})
+        return jsonify({"success": True, "full_name": safe_get(r, ['full_name', 'name', 'first_name']), "is_activated": is_active})
+    print(f"[VERIFY]: No record found for '{e}'")
     return jsonify({"error": "Staff not found"}), 404
 
 @app.route('/api/activate-staff', methods=['POST'])
