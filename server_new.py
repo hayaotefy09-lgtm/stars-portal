@@ -14,7 +14,7 @@ app = Flask(__name__)
 CORS(app)
 
 print('STARS Flask Cloud Server Initializing...')
-SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://bprbhhygcmhlvwpsvmyzt.supabase.co")
+SUPABASE_URL = os.environ.get('SUPABASE_URL', "https://bprbhygcmhlvwpsvmyzt.supabase.co")
 SUPABASE_KEY = os.environ.get('SUPABASE_ANON_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4")
 SUPABASE_SERVICE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I")
 
@@ -75,7 +75,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "144.0 Master Restoration"})
+    return jsonify({"status": "Online", "v": "145.0 DNS-Restored"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
