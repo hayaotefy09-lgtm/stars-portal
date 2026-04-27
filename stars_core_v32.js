@@ -1588,9 +1588,24 @@ window.initDiagnosticOverlay = () => {
 
 // Initialize Diagnostics and restore handlers
 document.addEventListener('DOMContentLoaded', () => {
-    if (window.location.hash.includes('#staff') || window.location.hash.includes('#portal')) {
-        setTimeout(initDiagnosticOverlay, 1000);
+    // Heartbeat Monitor: Always initialize if on a portal/staff page
+    if (window.location.hash.includes('staff') || window.location.hash.includes('dashboard') || window.location.hash.includes('portal') || !!StarsSession.get().token) {
+        setTimeout(initDiagnosticOverlay, 500);
     }
+    
+    // Global Privilege Guard for Whiteboard
+    const observer = new MutationObserver(() => {
+        const postBox = document.getElementById('whiteboard-input-card');
+        if (postBox) {
+            const user = StarsSession.get().user;
+            if (user) {
+                const role = (user.role || '').toLowerCase();
+                const isStaff = role.includes('staff') || role.includes('counselor') || !!user.isCounselor || !!user.is_counselor;
+                if (isStaff) postBox.style.setProperty('display', 'none', 'important');
+            }
+        }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
 });
 
 window.handleFileSelect = (input) => {

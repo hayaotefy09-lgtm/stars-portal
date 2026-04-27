@@ -102,7 +102,7 @@ def init_cloud_seed():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "163.0 Auth Lockdown"})
+    return jsonify({"status": "Online", "v": "164.0 Final Restoration"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():

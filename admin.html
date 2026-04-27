@@ -507,10 +507,10 @@
                 const p = (role === 'Mentor') ? 'mentor' : ((role === 'ProgramStaff' || role === 'Counselor') ? 'staff' : 'mentee');
                 
                 // Name Resolution Master Logic
-                const name = u.full_name || u.name || u.displayName || 
-                           (u.first_name ? `${u.first_name} ${u.last_name || ''}`.strip() : '') || 
-                           (u.firstName ? `${u.firstName} ${u.lastName || ''}`.strip() : '') || 
-                           'Unknown User';
+                const name = (u.full_name || u.name || u.displayName || 
+                           (u.first_name ? `${u.first_name} ${u.last_name || ''}` : '') || 
+                           (u.firstName ? `${u.firstName} ${u.lastName || ''}` : '') || 
+                           'Unknown User').trim();
                 
                 uHTML += `<tr>
                     <td><span class="pill ${p}">${role}</span></td>
