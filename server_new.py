@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "167.0 Auth Engine Master"})
+    return jsonify({"status": "Online", "v": "168.0 Schema Resilience Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -228,22 +228,21 @@ def admin_create():
         data = request.get_json()
         email, fn, ln, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('role', 'Mentee')
         full_name = f"{fn} {ln}".strip()
+        payloads = [
+            {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "role": role, "password": "pass"},
+            {"email": email, "first_name": fn, "last_name": ln, "role": role, "password": "pass"},
+            {"email": email, "full_name": full_name, "role": role},
+            {"email": email, "first_name": fn, "last_name": ln, "role": role}
+        ]
         
-        user_data = {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "role": role, "password": "pass"}
         success = False
         for table in ['profiles', 'users', 'Registry', 'Staff']:
-            try:
-                supabase_admin.table(table).insert(user_data).execute()
-                success = True; break
-            except: continue
-            
-        if not success:
-            # Fallback without password column
-            for table in ['profiles', 'users', 'Registry', 'Staff']:
+            for p in payloads:
                 try:
-                    supabase_admin.table(table).insert({"email": email, "full_name": full_name, "role": role}).execute()
+                    supabase_admin.table(table).insert(p).execute()
                     success = True; break
                 except: continue
+            if success: break
 
         PASSWORD_MAP[email] = "pass"
         return jsonify({"success": True})
@@ -255,22 +254,21 @@ def register():
         data = request.get_json()
         email, fn, ln, pw, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('password', ''), data.get('role', 'Mentee')
         full_name = f"{fn} {ln}".strip()
+        payloads = [
+            {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+            {"email": email, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+            {"email": email, "full_name": full_name, "role": role},
+            {"email": email, "first_name": fn, "last_name": ln, "role": role}
+        ]
         
-        user_data = {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role}
         success = False
         for table in ['profiles', 'users', 'Registry', 'Staff']:
-            try:
-                supabase_admin.table(table).insert(user_data).execute()
-                success = True; break
-            except: continue
-            
-        if not success:
-            # Fallback without password column
-            for table in ['profiles', 'users', 'Registry', 'Staff']:
+            for p in payloads:
                 try:
-                    supabase_admin.table(table).insert({"email": email, "full_name": full_name, "role": role}).execute()
+                    supabase_admin.table(table).insert(p).execute()
                     success = True; break
                 except: continue
+            if success: break
 
         if not success: return jsonify({"error": "Database registration failed."}), 500
 
