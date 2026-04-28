@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "168.0 Schema Resilience Master"})
+    return jsonify({"status": "Online", "v": "169.0 Activation Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -254,25 +254,43 @@ def register():
         data = request.get_json()
         email, fn, ln, pw, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('password', ''), data.get('role', 'Mentee')
         full_name = f"{fn} {ln}".strip()
-        payloads = [
-            {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
-            {"email": email, "first_name": fn, "last_name": ln, "password": pw, "role": role},
-            {"email": email, "full_name": full_name, "role": role},
-            {"email": email, "first_name": fn, "last_name": ln, "role": role}
-        ]
         
-        success = False
+        # Check if user already exists (e.g. pre-imported without password)
+        user_exists = False
+        existing_table = None
         for table in ['profiles', 'users', 'Registry', 'Staff']:
-            for p in payloads:
-                try:
-                    supabase_admin.table(table).insert(p).execute()
-                    success = True; break
-                except: continue
-            if success: break
+            try:
+                res = supabase_admin.table(table).select('*').eq('email', email).execute()
+                if res.data:
+                    user_exists = True; existing_table = table; break
+            except: continue
 
-        if not success: return jsonify({"error": "Database registration failed."}), 500
+        if user_exists:
+            # Upsert/Activation Flow: Update details and inject password
+            try:
+                supabase_admin.table(existing_table).update({"first_name": fn, "last_name": ln, "role": role}).eq('email', email).execute()
+            except: pass
+        else:
+            # Standard Insertion Flow
+            payloads = [
+                {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+                {"email": email, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+                {"email": email, "full_name": full_name, "role": role},
+                {"email": email, "first_name": fn, "last_name": ln, "role": role}
+            ]
+            
+            success = False
+            for table in ['profiles', 'users', 'Registry', 'Staff']:
+                for p in payloads:
+                    try:
+                        supabase_admin.table(table).insert(p).execute()
+                        success = True; break
+                    except: continue
+                if success: break
 
-        # Inject into Virtual Auth Engine so login works immediately
+            if not success: return jsonify({"error": "Database registration failed."}), 500
+
+        # Inject into Virtual Auth Engine so login works immediately (and persistently)
         PASSWORD_MAP[email] = pw
         
         # Auto-login to prevent the client's 'Authentication failed' token error
