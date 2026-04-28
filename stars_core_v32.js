@@ -475,7 +475,7 @@ async function initDashboard() {
             { id: 'survey', label: 'Survey Center', hideForMentees: true, hideForMentors: true },
             { id: 'sessions', label: 'My Sessions', hideForStaffOnly: true, hideForVisitors: true },
             { id: 'resources', label: 'Library' },
-            { id: 'whiteboard', label: 'Whiteboard' },
+            { id: 'whiteboard', label: 'Whiteboard', hideForMentees: true },
             { id: 'profile', label: 'My Profile' },
             { id: 'contact', label: 'Contact Us' },
             { id: 'settings', label: 'Settings' }

@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "169.0 Activation Master"})
+    return jsonify({"status": "Online", "v": "170.0 Whiteboard Hardening Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -388,15 +388,33 @@ def handle_whiteboard():
             return jsonify([])
         else:
             if role != 'Mentor': return jsonify({"error": "Only Mentors can post whiteboard notes."}), 403
-            data = request.get_json(); note = data.get('note')
+            data = request.get_json()
+            note = data.get('note') or data.get('content')
             if not note: return jsonify({"error": "Note content required"}), 400
             
-            supabase_admin.table('whiteboard').insert({
-                "created_by": u['email'],
-                "content": note,
-                "timestamp": datetime.datetime.now().isoformat(),
-                "category": "Session Note"
-            }).execute()
+            success = False
+            for table in ['whiteboard', 'Whiteboard', 'Notes', 'mentor_notes']:
+                try:
+                    supabase_admin.table(table).insert({
+                        "created_by": u['email'],
+                        "content": note,
+                        "timestamp": datetime.datetime.now().isoformat(),
+                        "category": "Session Note"
+                    }).execute()
+                    success = True; break
+                except:
+                    # Fallback for old schema
+                    try:
+                        supabase_admin.table(table).insert({
+                            "mentor_name": u['name'],
+                            "mentor_email": u['email'],
+                            "note": note,
+                            "created_at": datetime.datetime.now().isoformat()
+                        }).execute()
+                        success = True; break
+                    except: continue
+
+            if not success: return jsonify({"error": "Failed to sync note to cloud."}), 500
             return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
