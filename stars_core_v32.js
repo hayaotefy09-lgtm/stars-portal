@@ -1263,19 +1263,35 @@ window.submitSchedule = async () => {
         }
     }
 
+    const errDisplay = document.getElementById('schedule-error-display');
+    if (errDisplay) { errDisplay.style.display = 'none'; errDisplay.innerText = ''; }
+
     const res = await fetch('/api/sessions/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
         body: JSON.stringify({ pair_id: pairId, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
     });
+
     if (res.ok) {
         alert("✅ Session Scheduled successfully!");
         window.closeScheduleModal();
         window.syncPortalData();
     } else {
-        const err = await res.json();
-        alert("❌ Scheduling Error: " + (err.error || "Check backend logs"));
-        console.error("[STARS]: Schedule failed", err);
+        let errMsg = "Unknown Error";
+        try {
+            const err = await res.json();
+            errMsg = err.error || JSON.stringify(err);
+        } catch(e) {
+            errMsg = `HTTP ${res.status}: ${res.statusText}`;
+        }
+        
+        if (errDisplay) {
+            errDisplay.innerText = "❌ Scheduling Error: " + errMsg;
+            errDisplay.style.display = 'block';
+        } else {
+            alert("❌ Scheduling Error: " + errMsg);
+        }
+        console.error("[STARS]: Schedule failed", errMsg);
     }
 };
 window.setSessionFilter = function (f) {
