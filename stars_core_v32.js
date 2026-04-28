@@ -48,6 +48,9 @@ window.showAuthForm = function (id) {
     if (id !== 'dash') window.location.hash = (id === 'menu' ? 'menu' : id);
     window.dismissLoader();
 
+    // Safety: Ensure loader is gone after 5s even if something hangs
+    setTimeout(() => window.dismissLoader(), 5000);
+
     if (menu) menu.style.display = (id === 'menu' ? 'grid' : 'none');
 
     forms.forEach(f => {
@@ -1295,24 +1298,28 @@ window.renderStaffSessionsSelector = function () {
     });
 
     target.innerHTML = `<div class="section-title" style="margin-top: 3rem;">SCHEDULE A SESSION</div>` +
-        Object.keys(grouped).map(mentor => `
-        <div class="pair-label" style="color: #64748b; font-size: 0.75rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase;">MENTOR: ${mentor}</div>
-        ${grouped[mentor].map(p => {
-            const displayName = p.mentee_name || p.name || 'Mentee';
-            const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-            return `
-            <div class="mentee-card-yellow" onclick="window.openScheduleModal('${displayName}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
-                <div style="display: flex; align-items: center; gap: 1rem;">
-                    <div style="background: #f7b731; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0;">${initials}</div>
-                    <div>
-                        <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${p.mentee_name}</div>
-                        <div style="font-size: 0.8rem; color: #1e293b; font-weight: 600;">${p.mentee_email || p.email || ''}</div>
-                        <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; margin-top:0.1rem;">Mentee • Tap to schedule session</div>
+        Object.keys(grouped).map(mentor => {
+            const pairsList = grouped[mentor].map(p => {
+                const displayName = p.mentee_name || p.name || 'Mentee';
+                const initials = displayName.trim().split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'M';
+                return `
+                <div class="mentee-card-yellow" onclick="window.openScheduleModal('${displayName}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <div style="background: #f7b731; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0;">${initials}</div>
+                        <div>
+                            <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${p.mentee_name}</div>
+                            <div style="font-size: 0.8rem; color: #1e293b; font-weight: 600;">${p.mentee_email || p.email || ''}</div>
+                            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 600; margin-top:0.1rem;">Mentee • Tap to schedule session</div>
+                        </div>
                     </div>
-                </div>
-            </div>
-        `).join('')}
-    `).join('');
+                </div>`;
+            }).join('');
+            
+            return `
+                <div class="pair-label" style="color: #64748b; font-size: 0.75rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase;">MENTOR: ${mentor}</div>
+                ${pairsList}
+            `;
+        }).join('');
 };
 window.renderMentors = (mentors, targetId) => {
     const tid = targetId || 'mentors-grid';
