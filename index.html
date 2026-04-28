@@ -7,7 +7,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="style.css?v=12.0">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="stars_core_v32.js?v=12.0" defer></script>
+    <script src="stars_core_v32.js?v=13.0" defer></script>
     <style>
         /* Unified Confirmation Modal (CSS Pattern parity with admin) */
         .stars-modal-overlay {
@@ -560,7 +560,7 @@
                         <p>Sisterhood • Tenacity • Awareness • Resilience • Self-love</p>
                     </div>
                     <button class="btn-magenta"
-                        onclick="window.openScheduleModal(window.SELECTED_MENTEE_NAME || '', window.SELECTED_MENTEE_ID || '')"
+                        onclick="window.handleGeneralScheduleClick()"
                         style="display: flex; align-items: center; gap: 1rem; border-radius: 12px; padding: 1rem 1.5rem; font-size: 1rem;">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                             stroke-width="3">

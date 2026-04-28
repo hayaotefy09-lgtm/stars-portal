@@ -91,9 +91,35 @@ window.showPage = function (pageId, el) {
         window.renderSessions(data.sessions || []);
         if (isCounselor && window.renderStaffSessionsSelector) window.renderStaffSessionsSelector();
 
-        // Mentee Backup Visibility Logic
-        const backup = document.getElementById('mentee-backup-surveys');
-        if (backup) backup.style.display = (user?.role === 'Mentee' ? 'block' : 'none');
+        // 1. Auto-select pairing if missing and exactly one exists
+        if ((!window.SELECTED_MENTEE_NAME || window.SELECTED_MENTEE_NAME === 'undefined') && data.pairs && data.pairs.length === 1) {
+            const p = data.pairs[0];
+            const name = p.mentee_name || p.name || 'Partner';
+            window.SELECTED_MENTEE_NAME = name;
+            window.SELECTED_MENTEE_ID = p.pair_id;
+            window.SELECTED_PAIR_ID = p.pair_id;
+        }
+
+        // 2. Authoritative Backup Survey Rendering (BARS Parity)
+        const backupBox = document.getElementById('mentee-backup-surveys');
+        if (backupBox) {
+            const surveys = data.profile?.surveys || {};
+            const isMentor = user?.role === 'Mentor';
+            const isMentee = user?.role === 'Mentee';
+            
+            backupBox.style.display = (isMentee || isMentor) ? 'block' : 'none';
+            
+            const linkPre = document.getElementById('link-mentee-pre');
+            const linkPost = document.getElementById('link-mentee-post');
+            
+            if (isMentee) {
+                if (linkPre) { linkPre.href = surveys.mentee_pre || '#'; linkPre.textContent = 'Pre-Session Survey'; }
+                if (linkPost) { linkPost.href = surveys.mentee_post || '#'; linkPost.textContent = 'Post-Session Survey'; }
+            } else if (isMentor) {
+                if (linkPre) { linkPre.href = surveys.mentor_during || '#'; linkPre.textContent = 'During-Session Survey'; }
+                if (linkPost) { linkPost.href = surveys.mentor_post || '#'; linkPost.textContent = 'Post-Session Survey'; }
+            }
+        }
     }
     if (pageId === 'messages') window.renderMessages(data.messages || []);
     if (pageId === 'resources') window.renderResources(data.resources || []);
@@ -1131,7 +1157,7 @@ window.openScheduleModal = (n, p) => {
     window.SELECTED_PAIR_ID = p;
     
     const actualName = (n && n !== 'undefined') ? n : 'User';
-    const initials = actualName.trim().split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+    const initials = window.getSmartInitials(actualName);
     const avatar = document.getElementById('selected-partner-avatar');
     if (avatar) avatar.textContent = initials;
     
@@ -1150,6 +1176,31 @@ window.openScheduleModal = (n, p) => {
 };
 window.closeScheduleModal = () => document.getElementById('schedule-modal-overlay').style.display = 'none';
 window.switchScheduleStep = (s) => { document.getElementById('schedule-step-1').style.display = (s === 1 ? 'block' : 'none'); document.getElementById('schedule-step-2').style.display = (s === 2 ? 'block' : 'none'); };
+
+window.handleGeneralScheduleClick = () => {
+    const data = window.DASH_DATA || {};
+    const pairs = data.pairs || [];
+    
+    let name = window.SELECTED_MENTEE_NAME;
+    let id = window.SELECTED_MENTEE_ID || window.SELECTED_PAIR_ID;
+
+    if (!id || id === 'undefined') {
+        if (pairs.length === 1) {
+            const p = pairs[0];
+            name = p.mentee_name || p.name || 'Partner';
+            id = p.pair_id;
+            window.SELECTED_MENTEE_NAME = name;
+            window.SELECTED_MENTEE_ID = id;
+            window.SELECTED_PAIR_ID = id;
+        } else {
+            alert("Please select a partner from the Dashboard first to schedule a session.");
+            window.showPage('dashboard');
+            return;
+        }
+    }
+    
+    window.openScheduleModal(name, id);
+};
 window.updateCalendar = () => {
     const cont = document.getElementById('calendar-days');
     if (!cont) return;
@@ -1163,35 +1214,58 @@ window.updateCalendar = () => {
             div.style.opacity = '0.3';
             div.style.pointerEvents = 'none';
         } else {
-            div.onclick = () => { window.SELECTED_DATE = `2026-04-${d.toString().padStart(2, '0')}`; window.switchScheduleStep(2); };
+            div.onclick = () => { 
+                window.SELECTED_DATE = `2026-04-${d.toString().padStart(2, '0')}`; 
+                const display = document.getElementById('selected-date-display');
+                if (display) {
+                    const dateObj = new Date(2026, 3, d); // April is index 3
+                    display.textContent = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                }
+                window.switchScheduleStep(2); 
+            };
         }
         cont.appendChild(div);
     }
 };
 window.submitSchedule = async () => {
-    const time = document.getElementById('schedule-time-input').value;
-    const link = document.getElementById('schedule-link-input').value;
+    const time = document.getElementById('schedule-time-input')?.value;
+    const link = document.getElementById('schedule-link-input')?.value;
     const user = StarsSession.get()?.user;
-    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
+    const pairId = window.SELECTED_PAIR_ID || window.SELECTED_MENTEE_ID;
+    
+    if (!pairId || !window.SELECTED_DATE || !time) {
+        alert("Please select a date, time and ensure a partner is selected.");
+        return;
+    }
 
+    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
     let participants = '';
+    
     if (isCounselor) {
-        const mode = document.getElementById('meeting-participants-select').value;
+        const mode = document.getElementById('meeting-participants-select')?.value;
         const myPairs = window.DASH_DATA?.pairs || [];
-        const pair = myPairs.find(p => p.pair_id === window.SELECTED_PAIR_ID);
+        const pair = myPairs.find(p => p.pair_id === pairId);
         if (pair) {
-            participants = user.email; // Host is always in
+            participants = user.email;
             if (mode === 'Mentee Only') participants += `,${pair.mentee_email || pair.email}`;
             else participants += `,${pair.mentee_email || pair.email},${pair.mentor_email}`;
+        }
+    } else {
+        // Standard Mentor/Mentee scheduling: Include both emails
+        const myPairs = window.DASH_DATA?.pairs || [];
+        const pair = myPairs.find(p => p.pair_id === pairId);
+        if (pair) {
+            participants = `${pair.mentor_email},${pair.mentee_email || pair.email}`;
         }
     }
 
     const res = await fetch('/api/sessions/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
-        body: JSON.stringify({ pair_id: window.SELECTED_PAIR_ID, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
+        body: JSON.stringify({ pair_id: pairId, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
     });
-    if (res.ok) { window.closeScheduleModal(); initDashboard(); }
+    if (res.ok) { window.closeScheduleModal(); window.showPage('sessions'); }
+    else { alert("Scheduling failed. Please check your connection."); }
 };
 window.setSessionFilter = function (f) {
     window.CURRENT_SESSION_FILTER = f;
@@ -1281,6 +1355,13 @@ window.unlockSessionJoin = function (sessionId) {
     window.renderSessions(window.DASH_DATA.sessions); // Re-render to unlock
 };
 
+window.getSmartInitials = (name) => {
+    if (!name || name === 'undefined') return '?';
+    const parts = name.trim().split(' ');
+    if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return parts[0].substring(0, 2).toUpperCase();
+};
+
 window.renderStaffSessionsSelector = function () {
     const target = document.getElementById('counselor-session-controls');
     if (!target) return;
@@ -1301,7 +1382,7 @@ window.renderStaffSessionsSelector = function () {
         Object.keys(grouped).map(mentor => {
             const pairsList = grouped[mentor].map(p => {
                 const displayName = p.mentee_name || p.name || 'Mentee';
-                const initials = displayName.trim().split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'M';
+                const initials = window.getSmartInitials(displayName);
                 return `
                 <div class="mentee-card-yellow" onclick="window.openScheduleModal('${displayName}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
                     <div style="display: flex; align-items: center; gap: 1rem;">
