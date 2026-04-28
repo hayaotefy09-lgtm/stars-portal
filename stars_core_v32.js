@@ -1569,8 +1569,8 @@ window.checkSessionTimers = function () {
 
     const now = new Date();
     const MENTEE_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u";
-    const MENTOR_DURING_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
-    const MENTOR_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u"; // Placeholder mentor post
+    const MENTOR_DURING_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UME9IRUhDR09RNTQ3RTEwMDlRMTFCRktUSy4u";
+    const MENTOR_POST_LINK = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMUJWMVlYVEk0RDZDSjZaV0owRVQ4OFJINC4u";
 
     sessions.forEach(s => {
         const sTime = new Date(s.start_time);

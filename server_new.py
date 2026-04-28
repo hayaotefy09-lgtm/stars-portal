@@ -176,10 +176,10 @@ def handle_dashboard():
         is_c = normalize_role(u.get('role')) in ['ProgramStaff', 'Counselor']
         
         survey_links = {
-            "mentee_pre": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw_2BXp3VMmxMiX9DbxtNcF1UNFFERFlFRTBSNUEwQ0pWT1NDWlhBRUFPMC4u",
-            "mentee_post": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw_2BXp3VMmxMiX9DbxtNcF1UMERGNVk0SkY4RkY4RTRMS1E2SU85MVhVSC4u",
-            "mentor_post": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw5ArmNjQOFNPtxHCG2-Ep6dURVE1WEo3TUFORjg0N0NNWTVNTTNYUDdGNS4u",
-            "mentor_during": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw5ArmNjQOFNPtxHCG2-Ep6dUNUtZTEEyTU9VNVMyMEoxTjBTQk1KTlVaUC4u"
+            "mentee_pre": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u",
+            "mentee_post": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UQjcyWjJDQUwxNTE3TEZNRDhVSzlZNEZJMS4u",
+            "mentor_during": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UME9IRUhDR09RNTQ3RTEwMDlRMTFCRktUSy4u",
+            "mentor_post": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMUJWMVlYVEk0RDZDSjZaV0owRVQ4OFJINC4u"
         }
         
         res["profile"] = {"name": fn_u, "first_name": f_u, "last_name": l_u, "email": u.get('email'), "role": u['role'], "isCounselor": is_c, "surveys": survey_links}
@@ -548,6 +548,44 @@ def handle_resource_delete():
                 errs.append(str(e))
                 continue
         return jsonify({"error": f"Delete failed: {'; '.join(errs)}"}), 500
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/sessions/schedule', methods=['POST'])
+def handle_session_schedule():
+    u = get_user_from_headers()
+    if not u: return jsonify({"error": "Auth Required"}), 401
+    try:
+        data = request.get_json()
+        pid = data.get('pair_id')
+        start = data.get('start_time')
+        link = data.get('link')
+        parts = data.get('participants', '')
+        
+        if not pid or not start:
+            return jsonify({"error": "Pair ID and Start Time required"}), 400
+            
+        role = normalize_role(u['role'])
+        session_data = {
+            "pair_id": pid,
+            "start_time": start,
+            "meeting_link": link or "",
+            "scheduled_by": u['email'],
+            "scheduler_name": u['name'],
+            "scheduler_role": role,
+            "participants": parts,
+            "status": "Scheduled"
+        }
+        
+        # SCHEMA FALLBACK: Try multiple table names
+        errs = []
+        for table in ['sessions', 'Sessions', 'Events']:
+            try:
+                supabase_admin.table(table).insert(session_data).execute()
+                return jsonify({"success": True})
+            except Exception as e:
+                errs.append(str(e))
+                continue
+        return jsonify({"error": f"Schedule failed: {'; '.join(errs)}"}), 500
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/sessions/delete', methods=['POST'])
