@@ -669,13 +669,25 @@ def handle_session_delete():
         data = request.get_json(); sid = data.get('id')
         if not sid: return jsonify({"error": "Session ID required"}), 400
         
-        # SCHEMA FALLBACK
-        for table in ['sessions', 'Sessions', 'Events', 'Pairings']:
+        # SCHEMA FALLBACK: Try both Integer and String IDs across multiple tables
+        errs = []
+        for table in ['sessions', 'Sessions', 'Events']:
             try:
-                supabase_admin.table(table).delete().eq('id', sid).execute()
-                return jsonify({"success": True})
-            except: continue
-        return jsonify({"error": "Could not find session to delete"}), 404
+                # 1. Try Integer match
+                try: 
+                    r = supabase_admin.table(table).delete().eq('id', int(sid)).execute()
+                    if r.data: return jsonify({"success": True})
+                except: pass
+                
+                # 2. Try String/UUID match
+                r = supabase_admin.table(table).delete().eq('id', str(sid)).execute()
+                if r.data: return jsonify({"success": True})
+            except Exception as e:
+                errs.append(f"{table}: {str(e)}")
+                continue
+        
+        # If we reach here, no record was found or deleted
+        return jsonify({"error": f"Session not found or deletion failed: {'; '.join(errs)}"}), 404
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/delete-user', methods=['POST'])
