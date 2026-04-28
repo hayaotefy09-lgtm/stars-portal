@@ -11,10 +11,17 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 
+import traceback
 app = Flask(__name__)
 CORS(app)
 
-print('STARS Flask Cloud Server Initializing...')
+@app.errorhandler(Exception)
+def handle_exception(e):
+    print(f"[CRITICAL ERROR]: {str(e)}")
+    print(traceback.format_exc())
+    return jsonify({"error": str(e)}), 500
+
+print('STARS Authority Flask Initializing...')
 SUPABASE_URL = "https://bprbhygcmhlvwpsvmyzt.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0MDU3NTgsImV4cCI6MjA5MDk4MTc1OH0.g2VSOpXCnmZrwYNiJozRtzLjrsziozJoIeK6z4rj0j4"
 SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJwcmJoeWdjbWhsdndwc3ZteXp0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTQwNTc1OCwiZXhwIjoyMDkwOTgxNzU4fQ.7D45a-CI4ZSW8oRYiUgQNaRoikX735iHAZh_wPC116I"
@@ -597,7 +604,9 @@ def handle_session_schedule():
         pair = None
         for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings']:
             try:
-                r = supabase_admin.table(table).select('*').eq('id', pid).execute()
+                # Try both Integer and String lookups
+                try: r = supabase_admin.table(table).select('*').eq('id', int(pid)).execute()
+                except: r = supabase_admin.table(table).select('*').eq('id', str(pid)).execute()
                 if r.data: pair = r.data[0]; break
             except: continue
             
@@ -606,7 +615,8 @@ def handle_session_schedule():
         m_e = pair.get('mentor_email')
         s_e = pair.get('mentee_email')
         
-        session_data = {
+        # Primary Payload (Full Context)
+        session_data_full = {
             "mentor_email": m_e,
             "mentee_email": s_e,
             "session_date": start,
@@ -618,15 +628,30 @@ def handle_session_schedule():
             "pair_id": pid
         }
         
-        # SCHEMA FALLBACK: Try multiple table names
+        # Minimal Fallback Payload (Strict Schema Alignment v185.0)
+        session_data_min = {
+            "mentor_email": m_e,
+            "mentee_email": s_e,
+            "session_date": start,
+            "notes": link or "",
+            "status": "Scheduled"
+        }
+        
+        # SCHEMA FALLBACK: Try multiple table names and payload depths
         errs = []
         for table in ['sessions', 'Sessions', 'Events']:
+            # Try Full Payload first
             try:
-                supabase_admin.table(table).insert(session_data).execute()
+                supabase_admin.table(table).insert(session_data_full).execute()
                 return jsonify({"success": True})
-            except Exception as e:
-                errs.append(str(e))
-                continue
+            except Exception as e1:
+                # Try Minimal Fallback
+                try:
+                    supabase_admin.table(table).insert(session_data_min).execute()
+                    return jsonify({"success": True})
+                except Exception as e2:
+                    errs.append(f"{table}: {str(e2)}")
+                    continue
         return jsonify({"error": f"Schedule failed: {'; '.join(errs)}"}), 500
     except Exception as e: return jsonify({"error": str(e)}), 500
 
