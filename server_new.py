@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "171.0 Registry Resolution Master"})
+    return jsonify({"status": "Online", "v": "172.0 Pairing Engine Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -217,12 +217,39 @@ def admin_data():
                         r['name'] = safe_get(r, ['full_name', 'name']) or f"{safe_get(r, ['first_name', 'firstName'], '')} {safe_get(r, ['last_name', 'lastName'], '')}".strip() or "User"
                     break
             except: continue
-        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'Pairings']:
+        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings']:
             try:
                 res = supabase_admin.table(table).select('*').execute()
                 if res.data: pairs = res.data; break
             except: continue
         return jsonify({"users": users, "pairs": pairs})
+    except Exception as e: return jsonify({"error": str(e)}), 500
+
+@app.route('/api/admin/pair', methods=['POST'])
+def admin_pair():
+    if request.headers.get('X-Admin-Bypass') != 'STARS2026': return jsonify({"error": "Unauthorized"}), 401
+    try:
+        data = request.get_json()
+        mentor = data.get('mentor')
+        mentee = data.get('mentee')
+        if not mentor or not mentee: return jsonify({"error": "Missing emails"}), 400
+        
+        success = False
+        payloads = [
+            {"mentor_email": mentor, "mentee_email": mentee},
+            {"mentor": mentor, "mentee": mentee}
+        ]
+        
+        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings']:
+            for p in payloads:
+                try:
+                    supabase_admin.table(table).insert(p).execute()
+                    success = True; break
+                except: continue
+            if success: break
+            
+        if not success: return jsonify({"error": "Database rejection."}), 500
+        return jsonify({"success": True})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/admin/create', methods=['POST'])
