@@ -1127,7 +1127,8 @@ window.openScheduleModal = (n, p) => {
     document.getElementById('selected-partner-name').textContent = n;
     window.SELECTED_PAIR_ID = p;
     
-    const initials = n.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
+    const actualName = (n && n !== 'undefined') ? n : '';
+    const initials = actualName.trim() ? actualName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '?';
     const avatar = document.getElementById('selected-partner-avatar');
     if (avatar) {
         avatar.textContent = initials;
@@ -1137,6 +1138,10 @@ window.openScheduleModal = (n, p) => {
         avatar.style.background = 'var(--stars-magenta)';
         avatar.style.color = 'white';
         avatar.style.fontWeight = '800';
+        avatar.style.borderRadius = '50%';
+        avatar.style.display = 'flex';
+        avatar.style.alignItems = 'center';
+        avatar.style.justifyContent = 'center';
     }
 
     window.updateCalendar();
