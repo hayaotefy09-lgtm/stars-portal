@@ -1275,7 +1275,8 @@ window.submitSchedule = async () => {
     if (res.ok) {
         alert("✅ Session Scheduled successfully!");
         window.closeScheduleModal();
-        window.syncPortalData();
+        if (window.initDashboard) window.initDashboard();
+        else window.location.reload();
     } else {
         let errMsg = "Unknown Error";
         try {
