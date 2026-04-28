@@ -92,10 +92,11 @@ window.showPage = function (pageId, el) {
         if (isCounselor && window.renderStaffSessionsSelector) window.renderStaffSessionsSelector();
 
         // 1. Auto-select pairing if missing and exactly one exists
-        if ((!window.SELECTED_MENTEE_NAME || window.SELECTED_MENTEE_NAME === 'undefined') && data.pairs && data.pairs.length === 1) {
+        if ((!window.SELECTED_MENTEE_NAME || window.SELECTED_MENTEE_NAME === 'undefined' || window.SELECTED_MENTEE_NAME === user?.name) && data.pairs && data.pairs.length === 1) {
             const p = data.pairs[0];
-            const name = p.mentee_name || p.name || 'Partner';
-            window.SELECTED_MENTEE_NAME = name;
+            const isMeMentee = user?.role === 'Mentee';
+            const partnerName = isMeMentee ? (p.mentor_name || 'Your Mentor') : (p.mentee_name || p.name || 'Your Mentee');
+            window.SELECTED_MENTEE_NAME = partnerName;
             window.SELECTED_MENTEE_ID = p.pair_id;
             window.SELECTED_PAIR_ID = p.pair_id;
         }
@@ -1180,14 +1181,17 @@ window.switchScheduleStep = (s) => { document.getElementById('schedule-step-1').
 window.handleGeneralScheduleClick = () => {
     const data = window.DASH_DATA || {};
     const pairs = data.pairs || [];
+    const user = StarsSession.get()?.user;
     
     let name = window.SELECTED_MENTEE_NAME;
     let id = window.SELECTED_MENTEE_ID || window.SELECTED_PAIR_ID;
 
-    if (!id || id === 'undefined') {
+    // Force re-evaluation if the current name is the user's own name (BUG FIX v183.0)
+    if (!id || id === 'undefined' || name === user?.name) {
         if (pairs.length === 1) {
             const p = pairs[0];
-            name = p.mentee_name || p.name || 'Partner';
+            const isMeMentee = user?.role === 'Mentee';
+            name = isMeMentee ? (p.mentor_name || 'Your Mentor') : (p.mentee_name || p.name || 'Your Mentee');
             id = p.pair_id;
             window.SELECTED_MENTEE_NAME = name;
             window.SELECTED_MENTEE_ID = id;

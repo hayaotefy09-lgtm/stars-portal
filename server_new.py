@@ -564,13 +564,15 @@ def handle_session_schedule():
         if not pid or not start:
             return jsonify({"error": "Pair ID and Start Time required"}), 400
             
-        role = normalize_role(u['role'])
+        role = normalize_role(u.get('role', 'User'))
+        fn_u, _, _ = format_user_name(u)
+        
         session_data = {
             "pair_id": pid,
             "start_time": start,
             "meeting_link": link or "",
-            "scheduled_by": u['email'],
-            "scheduler_name": u['name'],
+            "scheduled_by": u.get('email'),
+            "scheduler_name": fn_u,
             "scheduler_role": role,
             "participants": parts,
             "status": "Scheduled"
