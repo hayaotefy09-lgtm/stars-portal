@@ -613,32 +613,32 @@ def handle_session_schedule():
         m_e = safe_get(pair, ['mentor_email', 'mentorEmail', 'mentor'])
         s_e = safe_get(pair, ['mentee_email', 'menteeEmail', 'mentee'])
 
-        # Step 3: Matched Column Names (Schema Alignment)
-        # We try three levels of payloads to find what your table accepts
+        # Step 3: Matched Column Names (Schema Alignment Bridge v188.0)
+        # We try multiple column names for the link to find the correct one for STARS
         payloads = [
-            # 1. Full Payload
+            # 1. Full Payload (meeting_link)
             {
-                "mentor_email": m_e,
-                "mentee_email": s_e,
-                "session_date": start,
-                "notes": link or "",
-                "status": "Scheduled",
-                "scheduled_by": u.get('email'),
-                "pair_id": pid
+                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
+                "meeting_link": link or "", "status": "Scheduled", "pair_id": pid
             },
-            # 2. Standard Payload (BARS style)
+            # 2. Minimalist (meeting_link)
             {
-                "mentor_email": m_e,
-                "mentee_email": s_e,
-                "session_date": start,
-                "notes": link or "",
-                "status": "Scheduled"
+                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
+                "meeting_link": link or ""
             },
-            # 3. Minimalist Payload (The "Safe" Bridge)
+            # 3. Fallback (link)
             {
-                "mentor_email": m_e,
-                "mentee_email": s_e,
-                "session_date": start
+                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
+                "link": link or ""
+            },
+            # 4. Fallback (notes) - Original BARS style
+            {
+                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
+                "notes": link or ""
+            },
+            # 5. Absolute Minimalist (The "Safe" Bridge)
+            {
+                "mentor_email": m_e, "mentee_email": s_e, "session_date": start
             }
         ]
         
@@ -650,7 +650,8 @@ def handle_session_schedule():
                     supabase_admin.table(table).insert(p_load).execute()
                     return jsonify({"success": True})
                 except Exception as e:
-                    errs.append(f"{table} ({list(p_load.keys())[0]}...): {str(e)}")
+                    # Capture specific column error to help debugging
+                    errs.append(f"{table}: {str(e)}")
                     continue
                 
         return jsonify({"error": f"Database Bridge Failed: {'; '.join(errs)}"}), 500
