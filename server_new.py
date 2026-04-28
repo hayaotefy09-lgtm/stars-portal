@@ -176,13 +176,13 @@ def handle_dashboard():
                 fn_m, _, _ = format_user_name(m); fn_s, _, _ = format_user_name(s)
                 res["pairs"].append({"mentor_name": fn_m, "mentee_name": fn_s, "pair_id": p_id, "mentor_email": m_email, "mentee_email": s_email})
         
-        # 3. Authoritative Session Normalization (Schema Alignment v184.0)
+        # 3. Authoritative Session Normalization (Backend Schema Bridge v186.0)
         sessions_normalized = []
         for s in sessions_data:
             m_e = safe_get(s, ['mentor_email', 'mentorEmail', 'mentor'])
             s_e = safe_get(s, ['mentee_email', 'menteeEmail', 'mentee'])
             
-            # Resolve Partner Name for UI rendering
+            # Resolve Partner Name
             partner_name = "Partner"
             if u['email'] == m_e:
                 p_u = users_map.get(s_e, {})
@@ -198,10 +198,9 @@ def handle_dashboard():
                 "status": s.get('status', 'Scheduled'),
                 "mentor_email": m_e,
                 "mentee_email": s_e,
-                "partner_name": partner_name,
-                "pair_id": s.get('pair_id')
+                "partner_name": partner_name
             })
-
+        
         res["resources"] = resources_data
         res["sessions"] = sessions_normalized
         res["messages"] = messages_data 
@@ -592,44 +591,30 @@ def handle_session_schedule():
         pid = data.get('pair_id')
         start = data.get('start_time')
         link = data.get('link')
-        parts = data.get('participants', '')
         
         if not pid or not start:
-            return jsonify({"error": "Pair ID and Start Time required"}), 400
-            
-        role = normalize_role(u.get('role', 'User'))
-        fn_u, _, _ = format_user_name(u)
-        
-        # Schema Alignment: Lookup emails from pairing table
+            return jsonify({"error": "Missing Required Fields"}), 400
+
+        # Step 2: Resolve Participant Emails (Schema Bridge v186.0)
         pair = None
-        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings']:
+        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings', 'pairs']:
             try:
-                # Try both Integer and String lookups
-                try: r = supabase_admin.table(table).select('*').eq('id', int(pid)).execute()
-                except: r = supabase_admin.table(table).select('*').eq('id', str(pid)).execute()
-                if r.data: pair = r.data[0]; break
+                for col in ['id', 'pair_id']:
+                    try:
+                        r = supabase_admin.table(table).select('*').eq(col, pid).execute()
+                        if r.data: pair = r.data[0]; break
+                    except: continue
+                if pair: break
             except: continue
             
-        if not pair: return jsonify({"error": "Pairing not found"}), 404
-        
-        m_e = pair.get('mentor_email')
-        s_e = pair.get('mentee_email')
-        
-        # Primary Payload (Full Context)
-        session_data_full = {
-            "mentor_email": m_e,
-            "mentee_email": s_e,
-            "session_date": start,
-            "notes": link or "",
-            "scheduled_by": u.get('email'),
-            "scheduler_name": fn_u,
-            "scheduler_role": role,
-            "status": "Scheduled",
-            "pair_id": pid
-        }
-        
-        # Minimal Fallback Payload (Strict Schema Alignment v185.0)
-        session_data_min = {
+        if not pair:
+            return jsonify({"error": "Pairing ID not found in database"}), 404
+            
+        m_e = safe_get(pair, ['mentor_email', 'mentorEmail', 'mentor'])
+        s_e = safe_get(pair, ['mentee_email', 'menteeEmail', 'mentee'])
+
+        # Step 3: Matched Column Names (Schema Alignment)
+        session_data = {
             "mentor_email": m_e,
             "mentee_email": s_e,
             "session_date": start,
@@ -637,23 +622,19 @@ def handle_session_schedule():
             "status": "Scheduled"
         }
         
-        # SCHEMA FALLBACK: Try multiple table names and payload depths
+        # SCHEMA FALLBACK: Try multiple table names
         errs = []
         for table in ['sessions', 'Sessions', 'Events']:
-            # Try Full Payload first
             try:
-                supabase_admin.table(table).insert(session_data_full).execute()
+                supabase_admin.table(table).insert(session_data).execute()
                 return jsonify({"success": True})
-            except Exception as e1:
-                # Try Minimal Fallback
-                try:
-                    supabase_admin.table(table).insert(session_data_min).execute()
-                    return jsonify({"success": True})
-                except Exception as e2:
-                    errs.append(f"{table}: {str(e2)}")
-                    continue
-        return jsonify({"error": f"Schedule failed: {'; '.join(errs)}"}), 500
-    except Exception as e: return jsonify({"error": str(e)}), 500
+            except Exception as e:
+                errs.append(f"{table}: {str(e)}")
+                continue
+                
+        return jsonify({"error": f"Database Bridge Failed: {'; '.join(errs)}"}), 500
+    except Exception as e:
+        return jsonify({"error": f"Bridge Exception: {str(e)}"}), 500
 
 @app.route('/api/sessions/delete', methods=['POST'])
 def handle_session_delete():
