@@ -1268,8 +1268,15 @@ window.submitSchedule = async () => {
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
         body: JSON.stringify({ pair_id: pairId, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
     });
-    if (res.ok) { window.closeScheduleModal(); window.showPage('sessions'); }
-    else { alert("Scheduling failed. Please check your connection."); }
+    if (res.ok) {
+        alert("✅ Session Scheduled successfully!");
+        window.closeScheduleModal();
+        window.syncPortalData();
+    } else {
+        const err = await res.json();
+        alert("❌ Scheduling Error: " + (err.error || "Check backend logs"));
+        console.error("[STARS]: Schedule failed", err);
+    }
 };
 window.setSessionFilter = function (f) {
     window.CURRENT_SESSION_FILTER = f;

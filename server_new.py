@@ -614,23 +614,44 @@ def handle_session_schedule():
         s_e = safe_get(pair, ['mentee_email', 'menteeEmail', 'mentee'])
 
         # Step 3: Matched Column Names (Schema Alignment)
-        session_data = {
-            "mentor_email": m_e,
-            "mentee_email": s_e,
-            "session_date": start,
-            "notes": link or "",
-            "status": "Scheduled"
-        }
+        # We try three levels of payloads to find what your table accepts
+        payloads = [
+            # 1. Full Payload
+            {
+                "mentor_email": m_e,
+                "mentee_email": s_e,
+                "session_date": start,
+                "notes": link or "",
+                "status": "Scheduled",
+                "scheduled_by": u.get('email'),
+                "pair_id": pid
+            },
+            # 2. Standard Payload (BARS style)
+            {
+                "mentor_email": m_e,
+                "mentee_email": s_e,
+                "session_date": start,
+                "notes": link or "",
+                "status": "Scheduled"
+            },
+            # 3. Minimalist Payload (The "Safe" Bridge)
+            {
+                "mentor_email": m_e,
+                "mentee_email": s_e,
+                "session_date": start
+            }
+        ]
         
-        # SCHEMA FALLBACK: Try multiple table names
+        # SCHEMA FALLBACK: Try multiple table names and payload depths
         errs = []
         for table in ['sessions', 'Sessions', 'Events']:
-            try:
-                supabase_admin.table(table).insert(session_data).execute()
-                return jsonify({"success": True})
-            except Exception as e:
-                errs.append(f"{table}: {str(e)}")
-                continue
+            for p_load in payloads:
+                try:
+                    supabase_admin.table(table).insert(p_load).execute()
+                    return jsonify({"success": True})
+                except Exception as e:
+                    errs.append(f"{table} ({list(p_load.keys())[0]}...): {str(e)}")
+                    continue
                 
         return jsonify({"error": f"Database Bridge Failed: {'; '.join(errs)}"}), 500
     except Exception as e:
