@@ -1127,23 +1127,11 @@ window.openScheduleModal = (n, p) => {
     document.getElementById('selected-partner-name').textContent = n;
     window.SELECTED_PAIR_ID = p;
     
-    const actualName = (n && n !== 'undefined') ? n : '';
-    const initials = actualName.trim() ? actualName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '?';
+    const actualName = (n && n !== 'undefined') ? n : 'User';
+    const initials = actualName.trim().split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || '?';
     const avatar = document.getElementById('selected-partner-avatar');
-    if (avatar) {
-        avatar.textContent = initials;
-        avatar.style.width = '55px';
-        avatar.style.height = '55px';
-        avatar.style.fontSize = '1.3rem';
-        avatar.style.background = 'var(--stars-magenta)';
-        avatar.style.color = 'white';
-        avatar.style.fontWeight = '800';
-        avatar.style.borderRadius = '50%';
-        avatar.style.display = 'flex';
-        avatar.style.alignItems = 'center';
-        avatar.style.justifyContent = 'center';
-    }
-
+    if (avatar) avatar.textContent = initials;
+    
     window.updateCalendar();
 
     // Privacy: Default to Mentee Only for Counselor sessions
@@ -1309,10 +1297,13 @@ window.renderStaffSessionsSelector = function () {
     target.innerHTML = `<div class="section-title" style="margin-top: 3rem;">SCHEDULE A SESSION</div>` +
         Object.keys(grouped).map(mentor => `
         <div class="pair-label" style="color: #64748b; font-size: 0.75rem; font-weight: 800; margin-top: 1.5rem; margin-bottom: 0.5rem; text-transform: uppercase;">MENTOR: ${mentor}</div>
-        ${grouped[mentor].map(p => `
-            <div class="mentee-card-yellow" onclick="window.openScheduleModal('${p.mentee_name}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
+        ${grouped[mentor].map(p => {
+            const displayName = p.mentee_name || p.name || 'Mentee';
+            const initials = displayName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            return `
+            <div class="mentee-card-yellow" onclick="window.openScheduleModal('${displayName}', '${p.pair_id}')" style="margin-bottom: 0.75rem; padding: 1.2rem 1.5rem; cursor: pointer; transition: 0.2s; border-radius: 20px;">
                 <div style="display: flex; align-items: center; gap: 1rem;">
-                    <div style="background: #f7b731; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0;">${p.mentee_name.charAt(0)}</div>
+                    <div style="background: #f7b731; color: white; width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 1.1rem; flex-shrink: 0;">${initials}</div>
                     <div>
                         <div style="font-weight: 800; color: #1e293b; font-size: 1.1rem;">${p.mentee_name}</div>
                         <div style="font-size: 0.8rem; color: #1e293b; font-weight: 600;">${p.mentee_email || p.email || ''}</div>
