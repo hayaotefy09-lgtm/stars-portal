@@ -169,8 +169,34 @@ def handle_dashboard():
                 fn_m, _, _ = format_user_name(m); fn_s, _, _ = format_user_name(s)
                 res["pairs"].append({"mentor_name": fn_m, "mentee_name": fn_s, "pair_id": p_id, "mentor_email": m_email, "mentee_email": s_email})
         
+        # 3. Authoritative Session Normalization (Schema Alignment v184.0)
+        sessions_normalized = []
+        for s in sessions_data:
+            m_e = safe_get(s, ['mentor_email', 'mentorEmail', 'mentor'])
+            s_e = safe_get(s, ['mentee_email', 'menteeEmail', 'mentee'])
+            
+            # Resolve Partner Name for UI rendering
+            partner_name = "Partner"
+            if u['email'] == m_e:
+                p_u = users_map.get(s_e, {})
+                partner_name, _, _ = format_user_name(p_u)
+            elif u['email'] == s_e:
+                p_u = users_map.get(m_e, {})
+                partner_name, _, _ = format_user_name(p_u)
+                
+            sessions_normalized.append({
+                "id": s.get('id'),
+                "start_time": s.get('session_date') or s.get('start_time'),
+                "meeting_link": s.get('notes') or s.get('meeting_link') or s.get('link'),
+                "status": s.get('status', 'Scheduled'),
+                "mentor_email": m_e,
+                "mentee_email": s_e,
+                "partner_name": partner_name,
+                "pair_id": s.get('pair_id')
+            })
+
         res["resources"] = resources_data
-        res["sessions"] = sessions_data
+        res["sessions"] = sessions_normalized
         res["messages"] = messages_data 
         fn_u, f_u, l_u = format_user_name(u)
         is_c = normalize_role(u.get('role')) in ['ProgramStaff', 'Counselor']
@@ -567,15 +593,29 @@ def handle_session_schedule():
         role = normalize_role(u.get('role', 'User'))
         fn_u, _, _ = format_user_name(u)
         
+        # Schema Alignment: Lookup emails from pairing table
+        pair = None
+        for table in ['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings']:
+            try:
+                r = supabase_admin.table(table).select('*').eq('id', pid).execute()
+                if r.data: pair = r.data[0]; break
+            except: continue
+            
+        if not pair: return jsonify({"error": "Pairing not found"}), 404
+        
+        m_e = pair.get('mentor_email')
+        s_e = pair.get('mentee_email')
+        
         session_data = {
-            "pair_id": pid,
-            "start_time": start,
-            "meeting_link": link or "",
+            "mentor_email": m_e,
+            "mentee_email": s_e,
+            "session_date": start,
+            "notes": link or "",
             "scheduled_by": u.get('email'),
             "scheduler_name": fn_u,
             "scheduler_role": role,
-            "participants": parts,
-            "status": "Scheduled"
+            "status": "Scheduled",
+            "pair_id": pid
         }
         
         # SCHEMA FALLBACK: Try multiple table names
