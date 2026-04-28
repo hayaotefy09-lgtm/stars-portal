@@ -613,36 +613,39 @@ def handle_session_schedule():
         m_e = safe_get(pair, ['mentor_email', 'mentorEmail', 'mentor'])
         s_e = safe_get(pair, ['mentee_email', 'menteeEmail', 'mentee'])
 
-        # Step 3: Matched Column Names (Schema Alignment Bridge v188.0)
-        # We try multiple column names for the link to find the correct one for STARS
-        payloads = [
-            # 1. Full Payload (meeting_link)
-            {
-                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
-                "meeting_link": link or "", "status": "Scheduled", "pair_id": pid
-            },
-            # 2. Minimalist (meeting_link)
-            {
-                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
-                "meeting_link": link or ""
-            },
-            # 3. Fallback (link)
-            {
-                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
-                "link": link or ""
-            },
-            # 4. Fallback (notes) - Original BARS style
-            {
-                "mentor_email": m_e, "mentee_email": s_e, "session_date": start,
-                "notes": link or ""
-            },
-            # 5. Absolute Minimalist (The "Safe" Bridge)
-            {
-                "mentor_email": m_e, "mentee_email": s_e, "session_date": start
-            }
-        ]
+        # Step 3: Universal Schema Bridge (v189.0)
+        # We will probe the 'sessions' table with every known column variation
         
-        # SCHEMA FALLBACK: Try multiple table names and payload depths
+        # Date Columns to try
+        date_cols = ['start_time', 'session_date', 'scheduled_at', 'date']
+        # Link Columns to try
+        link_cols = ['meeting_link', 'notes', 'link', 'url', 'meeting_url']
+        
+        # Build probing payloads
+        payloads = []
+        for d_col in date_cols:
+            for l_col in link_cols:
+                # 1. Full Payload (With pair_id and status)
+                payloads.append({
+                    "mentor_email": m_e, "mentee_email": s_e, d_col: start,
+                    l_col: link or "", "status": "Scheduled", "pair_id": pid, "scheduled_by": u.get('email')
+                })
+                # 2. Standard Payload
+                payloads.append({
+                    "mentor_email": m_e, "mentee_email": s_e, d_col: start,
+                    l_col: link or "", "status": "Scheduled"
+                })
+                # 3. Minimalist Payload
+                payloads.append({
+                    "mentor_email": m_e, "mentee_email": s_e, d_col: start,
+                    l_col: link or ""
+                })
+        
+        # Absolute Minimalist probes (if all links fail)
+        for d_col in date_cols:
+             payloads.append({"mentor_email": m_e, "mentee_email": s_e, d_col: start})
+
+        # SCHEMA PROBING: Try multiple table names and payload variations
         errs = []
         for table in ['sessions', 'Sessions', 'Events']:
             for p_load in payloads:
@@ -650,11 +653,11 @@ def handle_session_schedule():
                     supabase_admin.table(table).insert(p_load).execute()
                     return jsonify({"success": True})
                 except Exception as e:
-                    # Capture specific column error to help debugging
-                    errs.append(f"{table}: {str(e)}")
+                    # Capture specific column error
+                    errs.append(f"{table} ({list(p_load.keys())}): {str(e)}")
                     continue
                 
-        return jsonify({"error": f"Database Bridge Failed: {'; '.join(errs)}"}), 500
+        return jsonify({"error": f"Universal Bridge Failed: {'; '.join(errs)}"}), 500
     except Exception as e:
         return jsonify({"error": f"Bridge Exception: {str(e)}"}), 500
 
