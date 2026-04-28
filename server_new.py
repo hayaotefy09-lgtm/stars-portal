@@ -193,12 +193,13 @@ def handle_dashboard():
                 
             sessions_normalized.append({
                 "id": s.get('id'),
-                "start_time": s.get('session_date') or s.get('start_time'),
-                "meeting_link": s.get('notes') or s.get('meeting_link') or s.get('link'),
+                "start_time": s.get('session_date') or s.get('start_time') or s.get('scheduled_at') or s.get('date'),
+                "meeting_link": s.get('meeting_link') or s.get('notes') or s.get('link') or s.get('url') or s.get('meeting_url'),
                 "status": s.get('status', 'Scheduled'),
                 "mentor_email": m_e,
                 "mentee_email": s_e,
-                "partner_name": partner_name
+                "partner_name": partner_name,
+                "scheduled_by": s.get('scheduled_by')
             })
         
         res["resources"] = resources_data
@@ -625,20 +626,19 @@ def handle_session_schedule():
         payloads = []
         for d_col in date_cols:
             for l_col in link_cols:
-                # 1. Full Payload (With pair_id and status)
+                # 1. Full Payload
                 payloads.append({
                     "mentor_email": m_e, "mentee_email": s_e, d_col: start,
                     l_col: link or "", "status": "Scheduled", "pair_id": pid, "scheduled_by": u.get('email')
                 })
-                # 2. Standard Payload
+                # 2. Minimalist (Still including scheduled_by)
                 payloads.append({
                     "mentor_email": m_e, "mentee_email": s_e, d_col: start,
-                    l_col: link or "", "status": "Scheduled"
+                    l_col: link or "", "scheduled_by": u.get('email')
                 })
-                # 3. Minimalist Payload
+                # 3. Absolute Minimalist (Discovery mode)
                 payloads.append({
-                    "mentor_email": m_e, "mentee_email": s_e, d_col: start,
-                    l_col: link or ""
+                    "mentor_email": m_e, "mentee_email": s_e, d_col: start, "scheduled_by": u.get('email')
                 })
         
         # Absolute Minimalist probes (if all links fail)

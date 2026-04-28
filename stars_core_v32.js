@@ -1327,7 +1327,8 @@ window.renderSessions = function (sessions) {
         const isMentorForStaffSession = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor') && user.role === 'Mentor';
 
         // Final Parity Visibility for Trash Icon
-        const canTrash = isScheduler || isCounselor || isMentorForStaffSession;
+        const isMentor = user.role === 'Mentor' || user.role === 'mentor';
+        const canTrash = isScheduler || isCounselor || isMentorForStaffSession || (isMentor && s.mentor_email === user.email);
 
         // JOIN LOCK LOGIC (Mentees only)
         // Link remains inactive until they click the Pre-Session survey link
@@ -1360,7 +1361,7 @@ window.renderSessions = function (sessions) {
 
         return `<div style="background:white; border-radius:20px; padding:1.5rem; border:1.5px solid #fce4ec; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
             <div style="flex: 1;">
-                <div style="font-weight:800; color:#e84393;">${new Date(s.start_time).toLocaleString()}</div>
+                <div style="font-weight:800; color:#e84393;">${new Date(s.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' })}</div>
                 <div style="font-size:0.8rem; color:#64748b; font-weight: 600;">${s.partner_name || 'Partner'}</div>
                 ${attribution}
                 ${lockNote}
