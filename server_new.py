@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "174.0 Universal Schema Master"})
+    return jsonify({"status": "Online", "v": "175.0 Consistent Payload Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -157,11 +157,13 @@ def handle_dashboard():
             if cur_role == 'Mentor' and m_email == u['email']:
                 uu = users_map.get(s_email, {})
                 fn, f_name, l_name = format_user_name(uu)
-                res["pairs"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": s_email, "pair_id": p_id, "type": "Mentee", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
+                fn_m, _, _ = format_user_name(u)
+                res["pairs"].append({"name": fn, "mentor_name": fn_m, "mentee_name": fn, "first_name": f_name, "last_name": l_name, "email": s_email, "mentee_email": s_email, "pair_id": p_id, "type": "Mentee", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
             elif cur_role == 'Mentee' and s_email == u['email']:
                 uu = users_map.get(m_email, {})
                 fn, f_name, l_name = format_user_name(uu)
-                res["pairs"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": m_email, "pair_id": p_id, "type": "Mentor", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
+                fn_s, _, _ = format_user_name(u)
+                res["pairs"].append({"name": fn, "mentor_name": fn, "mentee_name": fn_s, "first_name": f_name, "last_name": l_name, "email": m_email, "mentor_email": m_email, "pair_id": p_id, "type": "Mentor", "bio": safe_get(uu, ['bio']), "interests": safe_get(uu, ['interests'])})
             elif cur_role == 'ProgramStaff':
                 m = users_map.get(m_email, {}); s = users_map.get(s_email, {})
                 fn_m, _, _ = format_user_name(m); fn_s, _, _ = format_user_name(s)
