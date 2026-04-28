@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "172.0 Pairing Engine Master"})
+    return jsonify({"status": "Online", "v": "173.0 Seamless Re-Claim Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -192,6 +192,14 @@ def handle_login():
             # VIRTUAL PASSWORD HANDSHAKE
             db_pass = (r.get('password') or PASSWORD_MAP.get(e) or "").strip()
             print(f"[AUTH DEBUG]: Trying {e} | Input: '{p}' | DB/Map: '{db_pass}'")
+            
+            # SEAMLESS RE-CLAIM: If server restarts and wipes memory, trust the first login attempt to re-seed the Auth Engine
+            if not db_pass and p:
+                db_pass = p
+                PASSWORD_MAP[e] = p
+                try: supabase_admin.table(table).update({"password": p}).eq('email', e).execute()
+                except: pass
+
             if db_pass == p:
                 fn = safe_get(r, ['full_name', 'name']) or f"{safe_get(r, ['first_name', 'firstName'], '')} {safe_get(r, ['last_name', 'lastName'], '')}".strip() or "User"
                 parts = fn.split(' ', 1); f_name = parts[0] if len(parts) > 0 else fn; l_name = parts[1] if len(parts) > 1 else ""
