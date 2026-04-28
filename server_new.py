@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "173.0 Seamless Re-Claim Master"})
+    return jsonify({"status": "Online", "v": "174.0 Universal Schema Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -404,24 +404,26 @@ def handle_whiteboard():
     try:
         role = normalize_role(u['role'])
         if request.method == 'GET':
-            for table in ['whiteboard', 'Whiteboard', 'Notes']:
+            for table in ['whiteboard', 'Whiteboard', 'Notes', 'mentor_notes']:
                 try:
-                    query = supabase_admin.table(table).select('*')
-                    if role == 'Mentor':
-                        query = query.eq('created_by', u['email'])
-                    
-                    resp = query.order('timestamp', desc=True).execute()
+                    # Fetch all to avoid schema-specific query failures, filter in python
+                    resp = supabase_admin.table(table).select('*').execute()
                     if resp.data is not None:
-                        # Ensure fields match JS expectations
                         formatted = []
                         for n in resp.data:
+                            cb = n.get('created_by') or n.get('mentor_email')
+                            if role == 'Mentor' and cb != u['email']: continue
+                            
                             formatted.append({
                                 "id": n.get('id'),
-                                "content": n.get('content', n.get('note', '')),
-                                "timestamp": n.get('timestamp', n.get('created_at', '')),
-                                "created_by": n.get('created_by', n.get('mentor_email', '')),
+                                "content": n.get('note_content') or n.get('content') or n.get('note', ''),
+                                "timestamp": n.get('created_at') or n.get('last_updated') or n.get('timestamp', ''),
+                                "created_by": cb,
+                                "mentor_name": n.get('mentor_name', ''),
                                 "category": n.get('category', 'Session Note')
                             })
+                        
+                        formatted.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
                         return jsonify(formatted)
                 except: continue
             return jsonify([])
@@ -436,19 +438,15 @@ def handle_whiteboard():
                 try:
                     supabase_admin.table(table).insert({
                         "created_by": u['email'],
-                        "content": note,
-                        "timestamp": datetime.datetime.now().isoformat(),
-                        "category": "Session Note"
+                        "mentor_name": u['name'],
+                        "note_content": note
                     }).execute()
                     success = True; break
                 except:
-                    # Fallback for old schema
                     try:
                         supabase_admin.table(table).insert({
-                            "mentor_name": u['name'],
                             "mentor_email": u['email'],
-                            "note": note,
-                            "created_at": datetime.datetime.now().isoformat()
+                            "content": note
                         }).execute()
                         success = True; break
                     except: continue
