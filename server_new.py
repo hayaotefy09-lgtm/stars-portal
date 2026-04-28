@@ -118,7 +118,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "170.0 Whiteboard Hardening Master"})
+    return jsonify({"status": "Online", "v": "171.0 Registry Resolution Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
@@ -211,7 +211,11 @@ def admin_data():
         for table in ['profiles', 'users', 'Registry', 'Staff']:
             try:
                 res = supabase_admin.table(table).select('*').execute()
-                if res.data: users = res.data; break
+                if res.data:
+                    users = res.data
+                    for r in users:
+                        r['name'] = safe_get(r, ['full_name', 'name']) or f"{safe_get(r, ['first_name', 'firstName'], '')} {safe_get(r, ['last_name', 'lastName'], '')}".strip() or "User"
+                    break
             except: continue
         for table in ['mentor_mentee_pairs', 'mentormenteepair', 'Pairings']:
             try:
