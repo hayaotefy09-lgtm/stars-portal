@@ -1500,7 +1500,7 @@ window.renderMentors = (mentors, targetId) => {
                     <div style="font-size: 0.8rem; color: #e84393; font-weight: 700; margin-top: 0.15rem; text-decoration: none;">View Profile</div>
                 </div>
             </div>
-            <div style="color: #16a34a; font-weight: 800; font-size: 0.8rem; letter-spacing: 0.3px;">Available</div>
+            <div style="color: ${m.status === 'Paired' ? '#f1c40f' : '#16a34a'}; font-weight: 800; font-size: 0.8rem; letter-spacing: 0.3px; background: ${m.status === 'Paired' ? '#fef9e7' : '#e8f8f0'}; padding: 0.3rem 0.6rem; border-radius: 8px; text-transform: uppercase;">${m.status || 'Available'}</div>
         </div>
     `).join('') + `</div>`;
 };

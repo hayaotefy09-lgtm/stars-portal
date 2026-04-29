@@ -162,12 +162,21 @@ def handle_dashboard():
             parts = fn.split(' ', 1); f_name = parts[0] if len(parts) > 0 else fn; l_name = parts[1] if len(parts) > 1 else ""
             return fn, f_name, l_name
 
+        # Resolve Paired Mentors for Status Badges (v199.0)
+        paired_mentor_emails = {safe_get(p, ['mentor_email', 'mentorEmail', 'mentor']) for p in pairs_data if safe_get(p, ['mentor_email', 'mentorEmail', 'mentor'])}
+
         for email, usr in users_map.items():
             if not email: continue
             role = normalize_role(safe_get(usr, ['role', 'user_role']))
             if role == 'Mentor':
                 fn, f_name, l_name = format_user_name(usr)
-                res["mentors"].append({"name": fn, "first_name": f_name, "last_name": l_name, "email": email, "bio": safe_get(usr, ['bio']), "interests": safe_get(usr, ['interests'])})
+                status = "Paired" if email in paired_mentor_emails else "Available"
+                res["mentors"].append({
+                    "name": fn, "first_name": f_name, "last_name": l_name, 
+                    "email": email, "bio": safe_get(usr, ['bio']), 
+                    "interests": safe_get(usr, ['interests']),
+                    "status": status
+                })
         
         for p in pairs_data:
             m_email = safe_get(p, ['mentor_email', 'mentorEmail', 'mentor'])
