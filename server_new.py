@@ -204,8 +204,9 @@ def handle_dashboard():
         
         res["resources"] = resources_data
         res["sessions"] = sessions_normalized
+        res["_schema"] = {"session_keys": list(sessions_data[0].keys()) if sessions_data else []}
         res["messages"] = messages_data 
-        fn_u, f_u, l_u = format_user_name(u)
+        
         is_c = normalize_role(u.get('role')) in ['ProgramStaff', 'Counselor']
         
         survey_links = {
@@ -669,25 +670,26 @@ def handle_session_delete():
         data = request.get_json(); sid = data.get('id')
         if not sid: return jsonify({"error": "Session ID required"}), 400
         
-        # SCHEMA FALLBACK: Try both Integer and String IDs across multiple tables
+        # SCHEMA FALLBACK: Try both Integer and String IDs across multiple tables/columns
         errs = []
-        for table in ['sessions', 'Sessions', 'Events']:
-            try:
-                # 1. Try Integer match
-                try: 
-                    r = supabase_admin.table(table).delete().eq('id', int(sid)).execute()
+        for table in ['sessions', 'Sessions', 'Events', 'mentor_mentee_sessions']:
+            for col in ['id', 'pair_id', 'session_id']:
+                try:
+                    # 1. Try Integer match
+                    try: 
+                        r = supabase_admin.table(table).delete().eq(col, int(sid)).execute()
+                        if r.data: return jsonify({"success": True})
+                    except: pass
+                    
+                    # 2. Try String/UUID match
+                    r = supabase_admin.table(table).delete().eq(col, str(sid)).execute()
                     if r.data: return jsonify({"success": True})
-                except: pass
-                
-                # 2. Try String/UUID match
-                r = supabase_admin.table(table).delete().eq('id', str(sid)).execute()
-                if r.data: return jsonify({"success": True})
-            except Exception as e:
-                errs.append(f"{table}: {str(e)}")
-                continue
+                except Exception as e:
+                    if 'relation "public.' + table.lower() + '" does not exist' not in str(e):
+                        errs.append(f"{table}.{col}: {str(e)}")
+                    continue
         
-        # If we reach here, no record was found or deleted
-        return jsonify({"error": f"Session not found or deletion failed: {'; '.join(errs)}"}), 404
+        return jsonify({"error": f"Session not found or deletion failed. Probed: {'; '.join(errs) or 'No tables found'}"}), 404
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/delete-user', methods=['POST'])
