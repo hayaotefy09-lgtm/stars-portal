@@ -208,6 +208,7 @@ def handle_dashboard():
         res["messages"] = messages_data 
         
         is_c = normalize_role(u.get('role')) in ['ProgramStaff', 'Counselor']
+        fn_u, f_u, l_u = format_user_name(u)
         
         survey_links = {
             "mentee_pre": "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u",
