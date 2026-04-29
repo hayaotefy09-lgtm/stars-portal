@@ -1334,7 +1334,7 @@ window.renderSessions = function (sessions) {
         const attributionHtml = attributionText ? `<div style="font-size:0.65rem; color:#94a3b8; margin-top:0.2rem; text-transform:uppercase; font-weight:800;">${attributionText}</div>` : '';
         
         const hasClickedPre = window.SURVEY_CLICKS?.[s.id] || false;
-        const lockNote = !hasClickedPre && isMentee && s.meeting_link ? `<div style="font-size:0.7rem; color:#ef4444; font-weight:700; margin-top:0.3rem;">⚠️ Fill survey to unlock link</div>` : '';
+        const lockNote = !hasClickedPre && s.meeting_link ? `<div style="font-size:0.7rem; color:#ef4444; font-weight:700; margin-top:0.3rem;">⚠️ Fill survey to unlock link</div>` : '';
 
         // SURVEY BUTTON AUTHORITY: Mentors see During-Session, Mentees see Pre-Session
         const preSurveyBtn = `<button onclick="window.unlockSessionJoin('${s.id}')" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:pointer; border:1px solid rgba(232, 67, 147, 0.2);">1. SURVEY</button>`;
@@ -1342,7 +1342,7 @@ window.renderSessions = function (sessions) {
         let linkActionHtml = '';
         const meetingLink = s.meeting_link || s.notes || '';
         if (meetingLink && meetingLink.trim() !== "" && meetingLink !== 'null') {
-            if (!isMentee || hasClickedPre) {
+            if (hasClickedPre) {
                 linkActionHtml = `<a href="${meetingLink}" target="_blank" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; text-decoration:none;">2. Join Session</a>`;
             } else {
                 linkActionHtml = `<button disabled style="background:#f1f5f9; color:#94a3b8; border:none; padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:not-allowed;">2. Join Locked</button>`;
@@ -1375,11 +1375,12 @@ window.renderSessions = function (sessions) {
 window.SURVEY_CLICKS = {};
 window.unlockSessionJoin = function (sessionId) {
     const user = StarsSession.get()?.user;
-    const surveys = window.DASH_DATA?.survey_links || {};
+    const surveys = window.DASH_DATA?.profile?.surveys || {};
     const isMentee = user?.role === 'Mentee' || user?.role === 'mentee';
 
     const link = isMentee ? surveys.mentee_pre : surveys.mentor_during;
     if (link) window.open(link, '_blank');
+    else console.error("STARS: Survey link not found in profile", surveys);
 
     window.SURVEY_CLICKS[sessionId] = true;
     window.renderSessions(window.DASH_DATA.sessions); // Re-render to unlock
