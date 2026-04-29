@@ -1345,16 +1345,20 @@ window.renderSessions = function (sessions) {
             : '';
 
         // Meeting Link Visualization
-        let linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" 
-                               style="text-decoration:none; padding:0.6rem 1.2rem; border-radius:12px; ${joinBtnStyle}">Join Call</a>`;
+        let linkActionHtml = `<button class="btn-magenta" style="opacity:0.5; cursor:not-allowed; padding:0.6rem 1.2rem; border-radius:12px; border:none; color:white; font-weight:800;">No Link</button>`;
 
-        if (!isJoinLocked && s.meeting_link) {
-            linkActionHtml = `
-                <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
-                    <a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="text-decoration:none; padding:0.8rem 1.5rem; border-radius:12px; font-weight:800; width:100%; text-align:center;">ENTER MEETING LINK</a>
-                    <div style="font-size:0.65rem; color:#22c55e; font-weight:800;">✓ ACCESS UNLOCKED</div>
-                </div>
-            `;
+        if (s.meeting_link && s.meeting_link.trim() !== "" && s.meeting_link !== 'null' && s.meeting_link !== 'undefined') {
+            linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" 
+                                style="text-decoration:none; padding:0.6rem 1.2rem; border-radius:12px; ${joinBtnStyle}">Join Call</a>`;
+
+            if (!isJoinLocked) {
+                linkActionHtml = `
+                    <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
+                        <a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="text-decoration:none; padding:0.8rem 1.5rem; border-radius:12px; font-weight:800; width:100%; text-align:center;">ENTER MEETING LINK</a>
+                        <div style="font-size:0.65rem; color:#22c55e; font-weight:800;">✓ ACCESS UNLOCKED</div>
+                    </div>
+                `;
+            }
         }
 
         return `<div style="background:white; border-radius:20px; padding:1.5rem; border:1.5px solid #fce4ec; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">

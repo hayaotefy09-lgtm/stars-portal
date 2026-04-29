@@ -194,7 +194,7 @@ def handle_dashboard():
             sessions_normalized.append({
                 "id": s.get('id'),
                 "start_time": s.get('session_date') or s.get('start_time') or s.get('scheduled_at') or s.get('date'),
-                "meeting_link": s.get('meeting_link') or s.get('notes') or s.get('link') or s.get('url') or s.get('meeting_url'),
+                "meeting_link": s.get('meeting_link') or s.get('notes') or s.get('link') or s.get('url') or s.get('meeting_url') or s.get('MeetingLink') or s.get('Notes'),
                 "status": s.get('status', 'Scheduled'),
                 "mentor_email": m_e,
                 "mentee_email": s_e,
