@@ -1410,7 +1410,7 @@ window.startSessionWatchdog = function () {
         const now = new Date().getTime();
         data.sessions.forEach(s => {
             const sTime = new Date(s.start_time).getTime();
-            const eTime = sTime + (55 * 60 * 1000); // 55 mins after start
+            const eTime = sTime + (40 * 60 * 1000); // 40 mins after start
             const endTime = sTime + (60 * 60 * 1000); // 1 hour after start
             
             // If we are in the "Ending Soon" window (5 mins before end)
