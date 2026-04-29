@@ -241,28 +241,27 @@ window.trashSurveySubmission = function (email, timestamp, type, btn) {
 
 window.trashSession = function (sessionId, btn) {
     window.starsConfirm("Are you sure you want to cancel and permanently delete this session?", async () => {
-        if (btn) { btn.disabled = true; btn.style.opacity = '0.5'; }
         try {
             const res = await fetch('/api/sessions/delete', {
                 method: 'POST',
-                headers: {
+                headers: { 
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${StarsSession.get().token}`
+                    'Authorization': `Bearer ${StarsSession.get().token}` 
                 },
                 body: JSON.stringify({ id: sessionId })
             });
-            const data = await res.json();
-            if (data.status === 'success' || data.success) {
-                alert("✓ Success: Session permanently cancelled.");
+            if (res.ok) {
+                btn.parentElement.parentElement.style.opacity = '0.3';
+                btn.parentElement.parentElement.style.pointerEvents = 'none';
+                alert("🗑️ Session deleted successfully!");
                 if (window.initDashboard) window.initDashboard();
                 else window.location.reload();
             } else {
-                alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
-                if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+                const err = await res.json();
+                alert("❌ Deletion Failed: " + (err.error || "Permission Denied"));
             }
         } catch (e) {
-            alert("❌ Connectivity Error: " + e.message);
-            if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
+            console.error("STARS: Delete Error", e);
         }
     });
 };
