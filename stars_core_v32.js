@@ -1329,44 +1329,34 @@ window.renderSessions = function (sessions) {
         const isMentor = user.role === 'Mentor' || user.role === 'mentor';
         const canTrash = isScheduler || isCounselor || isMentorForStaffSession || (isMentor && s.mentor_email === user.email);
 
-        // JOIN LOCK LOGIC (Mentees only)
-        // Link remains inactive until they click the Pre-Session survey link
-        const isJoinLocked = isMentee && !(window.SURVEY_CLICKS && window.SURVEY_CLICKS[s.id]);
-        const joinBtnStyle = isJoinLocked ? 'opacity:0.5; pointer-events:none; filter:grayscale(1);' : '';
-        const lockNote = isJoinLocked ? `<div style="font-size:0.65rem; color:#ef4444; font-weight:800; margin-top:0.3rem;">LOCKED: Complete Pre-Survey first</div>` : '';
+        const timeStr = new Date(s.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' });
+        
+        const attributionText = s.scheduled_by ? (s.scheduled_by === user.email ? 'SCHEDULED BY YOU' : `SCHEDULED BY ${isMentee ? 'MENTOR' : 'MENTEE'}`) : '';
+        const attributionHtml = attributionText ? `<div style="font-size:0.65rem; color:#94a3b8; margin-top:0.2rem; text-transform:uppercase; font-weight:800;">${attributionText}</div>` : '';
+        
+        const hasClickedPre = window.SURVEY_CLICKS?.[s.id] || false;
+        const lockNote = !hasClickedPre && isMentee && s.meeting_link ? `<div style="font-size:0.7rem; color:#ef4444; font-weight:700; margin-top:0.3rem;">⚠️ Fill survey to unlock link</div>` : '';
 
-        // MENTEE PRE-SURVEY LINK (Required for unlock)
-        const PRE_SURVEY_URL = "https://forms.office.com/Pages/ResponsePage.aspx?id=bvV_Bz_K30Cmp2nZVs8Lw9QMQpAEwXBPk9Yk-mW8Ba1UMTZXWjZIRE9ET1pWN05QVzcyUjhPSTZCRS4u";
-        const preSurveyBtn = isMentee && isJoinLocked
-            ? `<a href="${PRE_SURVEY_URL}" target="_blank" onclick="window.unlockSessionJoin('${s.id}')" class="btn-white" style="text-decoration:none; padding:0.6rem 1rem; border-radius:12px; font-size:0.75rem; border:1px solid #fce4ec; color:#e84393; font-weight:800;">1. Open Pre-Survey</a>`
-            : '';
-
-        const attribution = (s.scheduler_role === 'ProgramStaff' || s.scheduler_role === 'Counselor')
-            ? `<div style="font-size: 0.7rem; color: #e84393; font-weight: 800; text-transform: uppercase; margin-top: 0.2rem;">Scheduled by Counselor ${s.scheduler_name || 'Staff'}</div>`
-            : '';
-
-        // Meeting Link Visualization
-        let linkActionHtml = `<button class="btn-magenta" style="opacity:0.5; cursor:not-allowed; padding:0.6rem 1.2rem; border-radius:12px; border:none; color:white; font-weight:800;">No Link</button>`;
-
-        if (s.meeting_link && s.meeting_link.trim() !== "" && s.meeting_link !== 'null' && s.meeting_link !== 'undefined') {
-            linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" 
-                                style="text-decoration:none; padding:0.6rem 1.2rem; border-radius:12px; ${joinBtnStyle}">Join Call</a>`;
-
-            if (!isJoinLocked) {
-                linkActionHtml = `
-                    <div style="display:flex; flex-direction:column; gap:0.5rem; align-items:center;">
-                        <a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="text-decoration:none; padding:0.8rem 1.5rem; border-radius:12px; font-weight:800; width:100%; text-align:center;">ENTER MEETING LINK</a>
-                        <div style="font-size:0.65rem; color:#22c55e; font-weight:800;">✓ ACCESS UNLOCKED</div>
-                    </div>
-                `;
+        const preSurveyBtn = isMentee ? `<button onclick="window.unlockSessionJoin('${s.id}')" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:pointer;">1. SURVEY</button>` : '';
+        
+        let linkActionHtml = '';
+        if (s.meeting_link && s.meeting_link.trim() !== "" && s.meeting_link !== 'null') {
+            if (!isMentee || hasClickedPre) {
+                linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; text-decoration:none;">2. Join Session</a>`;
+            } else {
+                linkActionHtml = `<button disabled style="background:#f1f5f9; color:#94a3b8; border:none; padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:not-allowed;">2. Join Locked</button>`;
             }
+        } else {
+            linkActionHtml = `<button disabled style="background:#f1f5f9; color:#94a3b8; border:none; padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:not-allowed;">Link Pending</button>`;
         }
+
+        const partnerLabel = isMentee ? (s.partner_name || 'Mentor') : (s.partner_name || 'Mentee');
 
         return `<div style="background:white; border-radius:20px; padding:1.5rem; border:1.5px solid #fce4ec; margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center;">
             <div style="flex: 1;">
-                <div style="font-weight:800; color:#e84393;">${new Date(s.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' })}</div>
-                <div style="font-size:0.8rem; color:#64748b; font-weight: 600;">${s.partner_name || 'Partner'}</div>
-                ${attribution}
+                <div style="font-weight:800; color:#e84393;">${timeStr}</div>
+                <div style="font-size:0.8rem; color:#64748b; font-weight: 600;">${partnerLabel}</div>
+                ${attributionHtml}
                 ${lockNote}
             </div>
             <div style="display:flex; align-items:center; gap:0.5rem;">
