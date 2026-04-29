@@ -253,10 +253,8 @@ window.trashSession = function (sessionId, btn) {
             const data = await res.json();
             if (data.status === 'success' || data.success) {
                 alert("✓ Success: Session permanently cancelled.");
-                if (window.DASH_DATA && window.DASH_DATA.sessions) {
-                    window.DASH_DATA.sessions = window.DASH_DATA.sessions.filter(s => s.id !== sessionId);
-                }
-                window.showPage('sessions');
+                if (window.initDashboard) window.initDashboard();
+                else window.location.reload();
             } else {
                 alert("❌ Server Error: " + (data.error || 'Deletion failed.'));
                 if (btn) { btn.disabled = false; btn.style.opacity = '1'; }
