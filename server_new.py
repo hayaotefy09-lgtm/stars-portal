@@ -219,6 +219,8 @@ def handle_dashboard():
         
         res["resources"] = resources_data
         res["sessions"] = sessions_normalized
+        res["_debug"] = {"raw_sessions_count": len(sessions_data), "email": u['email']}
+        print(f"[DASHBOARD]: Found {len(sessions_data)} raw sessions for {u['email']}")
         res["_schema"] = {"session_keys": list(sessions_data[0].keys()) if sessions_data else []}
         res["messages"] = messages_data 
         

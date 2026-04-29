@@ -1313,8 +1313,17 @@ window.renderSessions = function (sessions) {
     const filter = window.CURRENT_SESSION_FILTER || 'Upcoming';
 
     const now = new Date().getTime();
+    console.log("STARS: Rendering sessions...", { filter, count: sessions.length, raw: sessions });
     const filtered = sessions.filter(s => {
+        if (!s.start_time) {
+            console.warn("STARS: Session missing start_time", s);
+            return true; // Don't filter out if date is missing, let us see it
+        }
         const sTime = new Date(s.start_time).getTime();
+        if (isNaN(sTime)) {
+            console.warn("STARS: Invalid date format", s.start_time, s);
+            return true;
+        }
         if (filter === 'Past') return sTime < now;
         if (filter === 'Upcoming') return sTime >= now;
         return true;
