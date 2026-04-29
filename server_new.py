@@ -125,7 +125,7 @@ def handle_admin_delete():
 
 @app.route('/api/initial-data', methods=['GET'])
 def initial_data():
-    return jsonify({"status": "Online", "v": "175.0 Consistent Payload Master"})
+    return jsonify({"status": "Online", "v": "197.4 System Master"})
 
 @app.route('/api/dashboard', methods=['GET'])
 def handle_dashboard():
