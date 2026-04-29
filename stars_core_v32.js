@@ -1337,7 +1337,8 @@ window.renderSessions = function (sessions) {
         const hasClickedPre = window.SURVEY_CLICKS?.[s.id] || false;
         const lockNote = !hasClickedPre && isMentee && s.meeting_link ? `<div style="font-size:0.7rem; color:#ef4444; font-weight:700; margin-top:0.3rem;">⚠️ Fill survey to unlock link</div>` : '';
 
-        const preSurveyBtn = isMentee ? `<button onclick="window.unlockSessionJoin('${s.id}')" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:pointer;">1. SURVEY</button>` : '';
+        // SURVEY BUTTON AUTHORITY: Mentors see During-Session, Mentees see Pre-Session
+        const preSurveyBtn = `<button onclick="window.unlockSessionJoin('${s.id}')" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:pointer;">1. SURVEY</button>`;
         
         let linkActionHtml = '';
         if (s.meeting_link && s.meeting_link.trim() !== "" && s.meeting_link !== 'null') {
@@ -1373,6 +1374,13 @@ window.renderSessions = function (sessions) {
 
 window.SURVEY_CLICKS = {};
 window.unlockSessionJoin = function (sessionId) {
+    const user = StarsSession.get()?.user;
+    const surveys = window.DASH_DATA?.survey_links || {};
+    const isMentee = user?.role === 'Mentee' || user?.role === 'mentee';
+
+    const link = isMentee ? surveys.mentee_pre : surveys.mentor_during;
+    if (link) window.open(link, '_blank');
+
     window.SURVEY_CLICKS[sessionId] = true;
     window.renderSessions(window.DASH_DATA.sessions); // Re-render to unlock
 };
