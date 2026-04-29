@@ -633,26 +633,35 @@ def handle_session_schedule():
         m_e = safe_get(pair, ['mentor_email', 'mentorEmail', 'mentor'])
         s_e = safe_get(pair, ['mentee_email', 'menteeEmail', 'mentee'])
 
+        # Rule: If counselor schedules and "include_mentor" is false, remove mentor email (v197.0)
+        is_counselor = bool(u.get('isCounselor')) or bool(u.get('is_counselor')) or u.get('role') == 'ProgramStaff'
+        if is_counselor and data.get('include_mentor') is False:
+            m_e = None
+
+        if not s_e:
+            return jsonify({"error": "Could not resolve mentee email from pairing"}), 400
+
         # Step 2.5: Mentor Collision Guard (v196.1)
-        try:
-            new_dt = datetime.fromisoformat(start.replace('Z', '+00:00'))
-            for s_table in ['sessions', 'Sessions', 'Events']:
-                try:
-                    # Query all sessions for this mentor (case-insensitive probe)
-                    r_col = supabase_admin.table(s_table).select('*').or_(f"mentor_email.ilike.{m_e},mentorEmail.ilike.{m_e}").execute()
-                    if r_col.data:
-                        for ex in r_col.data:
-                            ex_start_str = ex.get('session_date') or ex.get('start_time') or ex.get('date')
-                            if not ex_start_str: continue
-                            
-                            ex_dt = datetime.fromisoformat(ex_start_str.replace('Z', '+00:00'))
-                            diff_mins = abs((new_dt - ex_dt).total_seconds()) / 60
-                            
-                            if diff_mins < 60:
-                                return jsonify({"error": f"Conflict: Mentor is unavailable. They have a session at {ex_dt.strftime('%I:%M %p')} and require a 1-hour gap between meetings."}), 409
-                except: continue
-        except Exception as dt_err:
-            print(f"[COLLISION GUARD DEBUG]: Date parse failed: {str(dt_err)}")
+        if m_e:
+            try:
+                new_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
+                for s_table in ['sessions', 'Sessions', 'Events']:
+                    try:
+                        # Query all sessions for this mentor (case-insensitive probe)
+                        r_col = supabase_admin.table(s_table).select('*').or_(f"mentor_email.ilike.{m_e},mentorEmail.ilike.{m_e}").execute()
+                        if r_col.data:
+                            for ex in r_col.data:
+                                ex_start_str = ex.get('session_date') or ex.get('start_time') or ex.get('date')
+                                if not ex_start_str: continue
+                                
+                                ex_dt = datetime.datetime.fromisoformat(ex_start_str.replace('Z', '+00:00'))
+                                diff_mins = abs((new_dt - ex_dt).total_seconds()) / 60
+                                
+                                if diff_mins < 60:
+                                    return jsonify({"error": f"Conflict: Mentor is unavailable. They have a session at {ex_dt.strftime('%I:%M %p')} and require a 1-hour gap between meetings."}), 409
+                    except: continue
+            except Exception as dt_err:
+                print(f"[COLLISION GUARD DEBUG]: Date parse failed: {str(dt_err)}")
 
         # Step 3: Universal Schema Bridge (v189.0)
         # We will probe the 'sessions' table with every known column variation
@@ -666,12 +675,17 @@ def handle_session_schedule():
         payloads = []
         for d_col in date_cols:
             for l_col in link_cols:
-                # 1. Full Payload
+                # 1. Full Payload (Explicitly using mentor_email/mentee_email keys)
                 payloads.append({
                     "mentor_email": m_e, "mentee_email": s_e, d_col: start,
                     l_col: link or "", "status": "Scheduled", "pair_id": pid, "scheduled_by": u.get('email')
                 })
-                # 2. Minimalist (Still including scheduled_by)
+                # 1b. Camel Case Participant Payload
+                payloads.append({
+                    "mentorEmail": m_e, "menteeEmail": s_e, d_col: start,
+                    l_col: link or "", "status": "Scheduled", "pair_id": pid, "scheduled_by": u.get('email')
+                })
+                # 2. Minimalist
                 payloads.append({
                     "mentor_email": m_e, "mentee_email": s_e, d_col: start,
                     l_col: link or "", "scheduled_by": u.get('email')

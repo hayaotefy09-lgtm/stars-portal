@@ -1152,8 +1152,16 @@ window.addEventListener('load', () => {
 
 // Bindings
 window.openScheduleModal = (n, p) => {
+    const partnerNameEl = document.getElementById('selected-partner-name');
+    if (partnerNameEl) partnerNameEl.textContent = n;
+    
+    // Rule: Counselors see the 'Include Mentor' checkbox (v197.1)
+    const user = StarsSession.get()?.user;
+    const isCounselor = !!user?.isCounselor || !!user?.is_counselor;
+    const mentorOpt = document.getElementById('counselor-mentor-opt');
+    if (mentorOpt) mentorOpt.style.display = isCounselor ? 'block' : 'none';
+    
     document.getElementById('schedule-modal-overlay').style.display = 'flex';
-    document.getElementById('selected-partner-name').textContent = n;
     window.SELECTED_PAIR_ID = p;
     
     const actualName = (n && n !== 'undefined') ? n : 'User';
@@ -1164,8 +1172,6 @@ window.openScheduleModal = (n, p) => {
     window.updateCalendar();
 
     // Privacy: Default to Mentee Only for Counselor sessions
-    const user = StarsSession.get()?.user;
-    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
     const participantsWrap = document.getElementById('counselor-participants-wrap');
     if (participantsWrap) {
         participantsWrap.style.display = isCounselor ? 'block' : 'none';
@@ -1233,65 +1239,49 @@ window.updateCalendar = () => {
 window.submitSchedule = async () => {
     const time = document.getElementById('schedule-time-input')?.value;
     const link = document.getElementById('schedule-link-input')?.value;
-    const user = StarsSession.get()?.user;
     const pairId = window.SELECTED_PAIR_ID || window.SELECTED_MENTEE_ID;
     
     if (!pairId || !window.SELECTED_DATE || !time) {
         alert("Please select a date, time and ensure a partner is selected.");
         return;
     }
-
-    const isCounselor = !!user?.isCounselor || user?.role === 'ProgramStaff';
-    let participants = '';
     
-    if (isCounselor) {
-        const mode = document.getElementById('meeting-participants-select')?.value;
-        const myPairs = window.DASH_DATA?.pairs || [];
-        const pair = myPairs.find(p => p.pair_id === pairId);
-        if (pair) {
-            participants = user.email;
-            if (mode === 'Mentee Only') participants += `,${pair.mentee_email || pair.email}`;
-            else participants += `,${pair.mentee_email || pair.email},${pair.mentor_email}`;
-        }
-    } else {
-        // Standard Mentor/Mentee scheduling: Include both emails
-        const myPairs = window.DASH_DATA?.pairs || [];
-        const pair = myPairs.find(p => p.pair_id === pairId);
-        if (pair) {
-            participants = `${pair.mentor_email},${pair.mentee_email || pair.email}`;
-        }
-    }
+    const btn = document.getElementById('final-schedule-btn');
+    if (btn) { btn.disabled = true; btn.textContent = 'Scheduling...'; }
+    
+    const includeMentor = document.getElementById('schedule-include-mentor')?.checked !== false;
 
-    const errDisplay = document.getElementById('schedule-error-display');
-    if (errDisplay) { errDisplay.style.display = 'none'; errDisplay.innerText = ''; }
+    try {
+        const res = await fetch('/api/sessions/schedule', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
+            body: JSON.stringify({ 
+                pair_id: pairId, 
+                start_time: `${window.SELECTED_DATE}T${time}`, 
+                link: link || '',
+                include_mentor: includeMentor
+            })
+        });
 
-    const res = await fetch('/api/sessions/schedule', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${StarsSession.get().token}` },
-        body: JSON.stringify({ pair_id: pairId, start_time: `${window.SELECTED_DATE}T${time}`, link: link || '', participants: participants })
-    });
-
-    if (res.ok) {
-        alert("✅ Session Scheduled successfully!");
-        window.closeScheduleModal();
-        if (window.initDashboard) window.initDashboard();
-        else window.location.reload();
-    } else {
-        let errMsg = "Unknown Error";
-        try {
-            const err = await res.json();
-            errMsg = err.error || JSON.stringify(err);
-        } catch(e) {
-            errMsg = `HTTP ${res.status}: ${res.statusText}`;
-        }
-        
-        if (errDisplay) {
-            errDisplay.innerText = "❌ Scheduling Error: " + errMsg;
-            errDisplay.style.display = 'block';
+        if (res.ok) {
+            alert("✅ Session Scheduled successfully!");
+            window.closeScheduleModal();
+            if (window.initDashboard) window.initDashboard();
+            else window.location.reload();
         } else {
+            let errMsg = "Unknown Error";
+            try {
+                const err = await res.json();
+                errMsg = err.error || JSON.stringify(err);
+            } catch(e) {
+                errMsg = `HTTP ${res.status}: ${res.statusText}`;
+            }
             alert("❌ Scheduling Error: " + errMsg);
         }
-        console.error("[STARS]: Schedule failed", errMsg);
+    } catch(e) {
+        console.error("[STARS]: Schedule failed", e);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Confirm Schedule"; }
     }
 };
 window.setSessionFilter = function (f) {
@@ -1338,7 +1328,7 @@ window.renderSessions = function (sessions) {
         const isMentor = user.role === 'Mentor' || user.role === 'mentor';
         const canTrash = isScheduler || isCounselor || isMentorForStaffSession || (isMentor && s.mentor_email === user.email);
 
-        const timeStr = new Date(s.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' });
+        const timeStr = s.start_time ? new Date(s.start_time).toLocaleString('en-US', { hour: 'numeric', minute: 'numeric', hour12: true, month: 'short', day: 'numeric', year: 'numeric' }) : "Date TBD";
         
         const attributionText = s.scheduled_by ? (s.scheduled_by === user.email ? 'SCHEDULED BY YOU' : `SCHEDULED BY ${isMentee ? 'MENTOR' : 'MENTEE'}`) : '';
         const attributionHtml = attributionText ? `<div style="font-size:0.65rem; color:#94a3b8; margin-top:0.2rem; text-transform:uppercase; font-weight:800;">${attributionText}</div>` : '';
@@ -1350,9 +1340,10 @@ window.renderSessions = function (sessions) {
         const preSurveyBtn = `<button onclick="window.unlockSessionJoin('${s.id}')" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:pointer; border:1px solid rgba(232, 67, 147, 0.2);">1. SURVEY</button>`;
         
         let linkActionHtml = '';
-        if (s.meeting_link && s.meeting_link.trim() !== "" && s.meeting_link !== 'null') {
+        const meetingLink = s.meeting_link || s.notes || '';
+        if (meetingLink && meetingLink.trim() !== "" && meetingLink !== 'null') {
             if (!isMentee || hasClickedPre) {
-                linkActionHtml = `<a href="${s.meeting_link}" target="_blank" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; text-decoration:none;">2. Join Session</a>`;
+                linkActionHtml = `<a href="${meetingLink}" target="_blank" class="btn-magenta" style="padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; text-decoration:none;">2. Join Session</a>`;
             } else {
                 linkActionHtml = `<button disabled style="background:#f1f5f9; color:#94a3b8; border:none; padding:0.7rem 1.2rem; border-radius:12px; font-size:0.85rem; cursor:not-allowed;">2. Join Locked</button>`;
             }
