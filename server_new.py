@@ -359,55 +359,57 @@ def admin_create():
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/register', methods=['POST'])
-def register():
+def handle_register():
     try:
         data = request.get_json()
-        email, fn, ln, pw, role = data.get('email', '').lower().strip(), data.get('firstName', ''), data.get('lastName', ''), data.get('password', ''), data.get('role', 'Mentee')
+        email = data.get('email', '').lower().strip()
+        fn = data.get('firstName', '')
+        ln = data.get('lastName', '')
+        pw = data.get('password', '')
+        role = data.get('role', 'Mentee')
         full_name = f"{fn} {ln}".strip()
         
-        # Check if user already exists (e.g. pre-imported without password)
-        user_exists = False
+        if not email or not pw:
+            return jsonify({"error": "Email and Password are required."}), 400
+        
+        if len(pw) < 4:
+            return jsonify({"error": "Password must be at least 4 characters long."}), 400
+
+        # Step 1: Check if user already exists
+        existing_user = None
         existing_table = None
-        for table in ['profiles', 'users', 'Registry', 'Staff']:
+        for table in ['users', 'profiles', 'Registry', 'Staff']:
             try:
-                res = supabase_admin.table(table).select('*').eq('email', email).execute()
-                if res.data:
-                    user_exists = True; existing_table = table; break
+                r = supabase_admin.table(table).select('*').eq('email', email).execute()
+                if r.data: existing_user = r.data[0]; existing_table = table; break
             except: continue
-
-        if user_exists:
-            # Upsert/Activation Flow: Update details and inject password
-            try:
-                supabase_admin.table(existing_table).update({"first_name": fn, "last_name": ln, "role": role}).eq('email', email).execute()
-            except: pass
-        else:
-            # Standard Insertion Flow
-            payloads = [
-                {"email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
-                {"email": email, "first_name": fn, "last_name": ln, "password": pw, "role": role},
-                {"email": email, "full_name": full_name, "role": role},
-                {"email": email, "first_name": fn, "last_name": ln, "role": role}
-            ]
             
+        if existing_user:
+            # Step 2: Account Activation Logic (v200.1)
+            db_pass = existing_user.get('password', '')
+            placeholders = ['stars', 'stars2026', 'PENDING', 'PENDING_ACTIVATION', '', None]
+            
+            if db_pass in placeholders:
+                # ACTIVATE: Update existing record
+                supabase_admin.table(existing_table).update({"password": pw, "full_name": full_name}).eq('email', email).execute()
+            else:
+                return jsonify({"error": "Account already exists. Please use the Login tab."}), 400
+        else:
+            # Step 3: New User Registration
             success = False
-            for table in ['profiles', 'users', 'Registry', 'Staff']:
-                for p in payloads:
-                    try:
-                        supabase_admin.table(table).insert(p).execute()
-                        success = True; break
-                    except: continue
-                if success: break
-
+            for table in ['users', 'profiles', 'Registry']:
+                try:
+                    supabase_admin.table(table).insert({"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "password": pw, "role": role}).execute()
+                    success = True; break
+                except: continue
             if not success: return jsonify({"error": "Database registration failed."}), 500
 
-        # Inject into Virtual Auth Engine so login works immediately (and persistently)
+        # Inject into Virtual Auth Engine
         PASSWORD_MAP[email] = pw
-        
-        # Auto-login to prevent the client's 'Authentication failed' token error
         user = {"email": email, "role": role, "name": full_name, "first_name": fn, "last_name": ln, "isCounselor": (normalize_role(role) in ['ProgramStaff', 'Counselor']), "Gender": ""}
         token = str(uuid.uuid4()); SESSION_STORE[token] = user
         
-        return jsonify({"success": True, "token": token, "user": user}), 200
+        return jsonify({"success": True, "token": token, "user": user})
     except Exception as e: return jsonify({"error": str(e)}), 500
 
 @app.route('/api/verify-staff', methods=['POST'])
