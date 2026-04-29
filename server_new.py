@@ -136,7 +136,22 @@ def handle_dashboard():
         
         users_data = safe_fetch(['users', 'profiles', 'Registry', 'Staff'])
         pairs_data = safe_fetch(['mentor_mentee_pairs', 'mentormenteepair', 'MentorMenteePair', 'Pairings'])
-        sessions_data = safe_fetch(['sessions', 'Sessions', 'Events'])
+        
+        # Polymorphic Session Discovery (v195.1)
+        sessions_data = []
+        for table in ['sessions', 'Sessions', 'Events']:
+            try:
+                # Try Snake Case
+                r = supabase_admin.table(table).select('*').or_(f"mentor_email.eq.{u['email']},mentee_email.eq.{u['email']}").execute()
+                if r.data: sessions_data.extend(r.data)
+                # Try Camel Case (Discovery)
+                r_c = supabase_admin.table(table).select('*').or_(f"mentorEmail.eq.{u['email']},menteeEmail.eq.{u['email']}").execute()
+                if r_c.data:
+                    existing = {str(s.get('id')) for s in sessions_data}
+                    for s in r_c.data:
+                        if str(s.get('id')) not in existing: sessions_data.append(s)
+            except: continue
+            
         resources_data = safe_fetch(['resources', 'Resources', 'Library'])
         messages_data = safe_fetch(['messages', 'Messages', 'Chats'])
         
