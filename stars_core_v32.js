@@ -40,6 +40,7 @@ window.showAuthForm = function (id) {
         if (app) app.style.display = 'flex';
         window.dismissLoader(); // Ensure loader is hidden when entering dash
         initDashboard();
+        window.startSessionWatchdog(); // Start Automation Watchdog
         return;
     }
 
@@ -1392,6 +1393,56 @@ window.getSmartInitials = (name) => {
     if (parts.length > 1) return (parts[0][0] + parts[1][0]).toUpperCase();
     return parts[0].substring(0, 2).toUpperCase();
 };
+
+// 5. Session Watchdog (Automation v192.0)
+window.STARS_WATCHDOG_ACTIVE = false;
+window.startSessionWatchdog = function () {
+    if (window.STARS_WATCHDOG_ACTIVE) return;
+    window.STARS_WATCHDOG_ACTIVE = true;
+    log("Session Watchdog Started.");
+    
+    setInterval(() => {
+        const data = window.DASH_DATA;
+        if (!data || !data.sessions) return;
+        const user = StarsSession.get()?.user;
+        if (!user) return;
+        
+        const now = new Date().getTime();
+        data.sessions.forEach(s => {
+            const sTime = new Date(s.start_time).getTime();
+            const eTime = sTime + (55 * 60 * 1000); // 55 mins after start
+            const endTime = sTime + (60 * 60 * 1000); // 1 hour after start
+            
+            // If we are in the "Ending Soon" window (5 mins before end)
+            if (now >= eTime && now <= endTime) {
+                const alertId = `post-survey-alert-${s.id}`;
+                if (!document.getElementById(alertId)) {
+                    const postUrl = user.role === 'Mentee' ? data.survey_links?.mentee_post : data.survey_links?.mentor_post;
+                    if (postUrl) {
+                        showPostSessionAlert(alertId, postUrl, s.partner_name);
+                    }
+                }
+            }
+        });
+    }, 30000); // Check every 30 seconds
+};
+
+function showPostSessionAlert(id, url, partner) {
+    const container = document.getElementById('session-automation-alerts') || document.body;
+    const alertEl = document.createElement('div');
+    alertEl.id = id;
+    alertEl.className = 'stars-automation-alert';
+    alertEl.innerHTML = `
+        <div style="background: #e84393; color: white; padding: 1.25rem 1.5rem; border-radius: 20px; box-shadow: 0 10px 30px rgba(232, 67, 147, 0.3); display: flex; align-items: center; justify-content: space-between; gap: 1.5rem; animation: slideInRight 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); max-width: 400px; margin-bottom: 1rem;">
+            <div style="flex: 1;">
+                <div style="font-weight: 800; font-size: 0.95rem; margin-bottom: 0.2rem;">Session Ending Soon!</div>
+                <div style="font-size: 0.75rem; opacity: 0.9;">Please complete your Post-Session Survey for your session with ${partner}.</div>
+            </div>
+            <a href="${url}" target="_blank" onclick="this.parentElement.remove()" style="background: white; color: #e84393; padding: 0.7rem 1.2rem; border-radius: 12px; font-weight: 800; text-decoration: none; font-size: 0.8rem; white-space: nowrap;">Open Survey</a>
+        </div>
+    `;
+    container.appendChild(alertEl);
+}
 
 window.renderStaffSessionsSelector = function () {
     const target = document.getElementById('counselor-session-controls');
