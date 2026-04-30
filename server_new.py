@@ -385,24 +385,48 @@ def handle_register():
             except: continue
             
         if existing_user:
-            # Step 2: Account Activation Logic (v200.1)
+            # Step 2: Account Activation Logic (v201.0)
             db_pass = existing_user.get('password', '')
             placeholders = ['stars', 'stars2026', 'PENDING', 'PENDING_ACTIVATION', '', None]
             
             if db_pass in placeholders:
-                # ACTIVATE: Update existing record
-                supabase_admin.table(existing_table).update({"password": pw, "full_name": full_name}).eq('email', email).execute()
+                # ACTIVATE: Polymorphic Update (Try all column variants)
+                update_variants = [
+                    {"password": pw, "full_name": full_name, "first_name": fn, "last_name": ln},
+                    {"password": pw, "first_name": fn, "last_name": ln},
+                    {"password": pw, "full_name": full_name},
+                    {"password": pw, "name": full_name}
+                ]
+                success = False
+                for variant in update_variants:
+                    try:
+                        supabase_admin.table(existing_table).update(variant).eq('email', email).execute()
+                        success = True; break
+                    except: continue
+                
+                if not success:
+                    # Final fallback: just update the password
+                    supabase_admin.table(existing_table).update({"password": pw}).eq('email', email).execute()
             else:
                 return jsonify({"error": "Account already exists. Please use the Login tab."}), 400
         else:
             # Step 3: New User Registration
+            payloads = [
+                {"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+                {"id": str(uuid.uuid4()), "email": email, "first_name": fn, "last_name": ln, "password": pw, "role": role},
+                {"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "password": pw, "role": role},
+                {"id": str(uuid.uuid4()), "email": email, "name": full_name, "password": pw, "role": role}
+            ]
             success = False
-            for table in ['users', 'profiles', 'Registry']:
-                try:
-                    supabase_admin.table(table).insert({"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "password": pw, "role": role}).execute()
-                    success = True; break
-                except: continue
-            if not success: return jsonify({"error": "Database registration failed."}), 500
+            for table in ['users', 'profiles', 'Registry', 'Profiles']:
+                for p_load in payloads:
+                    try:
+                        supabase_admin.table(table).insert(p_load).execute()
+                        success = True; break
+                    except: continue
+                if success: break
+            
+            if not success: return jsonify({"error": "Database registration failed (Schema Mismatch)."}), 500
 
         # Inject into Virtual Auth Engine
         PASSWORD_MAP[email] = pw
