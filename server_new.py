@@ -385,28 +385,56 @@ def handle_register():
             except: continue
             
         if existing_user:
-            # Step 2: Account Activation Logic (v201.0)
+            # Step 2: Account Activation Logic (v202.0)
             db_pass = existing_user.get('password', '')
             placeholders = ['stars', 'stars2026', 'PENDING', 'PENDING_ACTIVATION', '', None]
             
             if db_pass in placeholders:
-                # ACTIVATE: Polymorphic Update (Try all column variants)
+                # ACTIVATE: Try multiple strategies to set the password
+                success = False
+                
+                # Strategy A: Update the existing table (if it has a password column)
                 update_variants = [
                     {"password": pw, "full_name": full_name, "first_name": fn, "last_name": ln},
                     {"password": pw, "first_name": fn, "last_name": ln},
                     {"password": pw, "full_name": full_name},
-                    {"password": pw, "name": full_name}
+                    {"password": pw, "name": full_name},
+                    {"password": pw}
                 ]
-                success = False
                 for variant in update_variants:
                     try:
                         supabase_admin.table(existing_table).update(variant).eq('email', email).execute()
                         success = True; break
                     except: continue
                 
+                # Strategy B: If Strategy A failed (likely missing 'password' column), 
+                # try to update the 'users' table or INSERT a new auth record.
                 if not success:
-                    # Final fallback: just update the password
-                    supabase_admin.table(existing_table).update({"password": pw}).eq('email', email).execute()
+                    try:
+                        # Try updating 'users' table
+                        supabase_admin.table('users').update({"password": pw}).eq('email', email).execute()
+                        success = True
+                    except:
+                        try:
+                            # Try inserting a new record into 'users' for auth
+                            supabase_admin.table('users').insert({
+                                "id": str(uuid.uuid4()), "email": email, "full_name": full_name, 
+                                "password": pw, "role": role
+                            }).execute()
+                            success = True
+                        except: pass
+                
+                # Strategy C: Always try to sync the name fields to the original table (ignoring password errors)
+                try:
+                    name_variant = {"full_name": full_name, "first_name": fn, "last_name": ln}
+                    supabase_admin.table(existing_table).update(name_variant).eq('email', email).execute()
+                except:
+                    try:
+                        supabase_admin.table(existing_table).update({"name": full_name}).eq('email', email).execute()
+                    except: pass
+                
+                if not success:
+                    return jsonify({"error": "Auth System Sync Failed. Please contact administration."}), 500
             else:
                 return jsonify({"error": "Account already exists. Please use the Login tab."}), 400
         else:
@@ -426,7 +454,7 @@ def handle_register():
                     except: continue
                 if success: break
             
-            if not success: return jsonify({"error": "Database registration failed (Schema Mismatch)."}), 500
+            if not success: return jsonify({"error": "Database registration failed (Master Schema Error)."}), 500
 
         # Inject into Virtual Auth Engine
         PASSWORD_MAP[email] = pw
