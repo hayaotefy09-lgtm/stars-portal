@@ -385,64 +385,54 @@ def handle_register():
             except: continue
             
         if existing_user:
-            # Step 2: Account Activation Logic (v202.2) - OMNI SYNC
+            # Step 2: Account Activation Logic (v203.0) - ZERO FRICTION
             db_pass = existing_user.get('password', '')
             placeholders = ['stars', 'stars2026', 'PENDING', 'PENDING_ACTIVATION', 'bars', '', None]
             
             if db_pass in placeholders:
-                # ACTIVATE: Cross-Table Synchronization
-                success = False
-                
-                # 1. Update the 'users' table (Master Auth) - Polymorphic Retry (v202.4)
+                # 1. Master Auth Sync (users table)
+                auth_success = False
                 try:
-                    # Probe for existing auth record
+                    # Check if they exist in users
                     r_u = supabase_admin.table('users').select('*').eq('email', email).execute()
+                    u_payloads = [{"password": pw, "full_name": full_name}, {"password": pw, "name": full_name}, {"password": pw}]
+                    
                     if r_u.data:
-                        # Update with polymorphic variants
-                        u_vars = [{"password": pw, "full_name": full_name}, {"password": pw, "name": full_name}, {"password": pw}]
-                        for uv in u_vars:
+                        for up in u_payloads:
                             try:
-                                supabase_admin.table('users').update(uv).eq('email', email).execute()
-                                success = True; break
+                                supabase_admin.table('users').update(up).eq('email', email).execute()
+                                auth_success = True; break
                             except: continue
                     else:
-                        # Insert with polymorphic variants
-                        i_vars = [
-                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "full_name": full_name, "role": role},
-                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "name": full_name, "role": role},
-                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "role": role}
-                        ]
-                        for iv in i_vars:
+                        for up in u_payloads:
                             try:
-                                supabase_admin.table('users').insert(iv).execute()
-                                success = True; break
+                                up.update({"id": str(uuid.uuid4()), "email": email, "role": role})
+                                supabase_admin.table('users').insert(up).execute()
+                                auth_success = True; break
                             except: continue
-                except Exception as e:
-                    print(f"[OMNI-AUTH DEBUG]: Users Table Sync Critical Error: {str(e)}")
+                except: pass
 
-                # 2. Update the original discovery table (Legacy Sync)
-                update_variants = [
-                    {"password": pw, "full_name": full_name, "first_name": fn, "last_name": ln},
-                    {"password": pw, "first_name": fn, "last_name": ln},
-                    {"password": pw, "full_name": full_name},
-                    {"password": pw}
-                ]
-                for variant in update_variants:
-                    try:
-                        supabase_admin.table(existing_table).update(variant).eq('email', email).execute()
-                        break
-                    except: continue
-                
-                if not success:
-                    return jsonify({"error": "Universal Sync Failed. Please contact administration."}), 500
+                # 2. Legacy Table Sync (The table where they were found)
+                legacy_success = False
+                try:
+                    l_payloads = [{"password": pw, "full_name": full_name, "first_name": fn, "last_name": ln}, {"password": pw, "name": full_name}, {"password": pw}]
+                    for lp in l_payloads:
+                        try:
+                            supabase_admin.table(existing_table).update(lp).eq('email', email).execute()
+                            legacy_success = True; break
+                        except: continue
+                except: pass
+
+                # Rule: As long as AT LEAST ONE table (Auth or Legacy) accepted the password, we consider it a SUCCESS.
+                if not auth_success and not legacy_success:
+                    return jsonify({"error": "Auth System Unavailable. Please try again or contact administration."}), 500
             else:
                 return jsonify({"error": "Account already exists. Please use the Login tab."}), 400
         else:
-            # Step 3: New User Registration (Universal Propagation)
+            # Step 3: Brand New User Registration
             success = False
-            for table in ['users', 'profiles', 'Registry']:
+            for table in ['users', 'profiles', 'Registry', 'Profiles']:
                 payloads = [
-                    {"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "first_name": fn, "last_name": ln, "password": pw, "role": role},
                     {"id": str(uuid.uuid4()), "email": email, "full_name": full_name, "password": pw, "role": role},
                     {"id": str(uuid.uuid4()), "email": email, "password": pw, "role": role}
                 ]
@@ -453,7 +443,7 @@ def handle_register():
                     except: continue
                 if success: break
             
-            if not success: return jsonify({"error": "Universal Registration Failed."}), 500
+            if not success: return jsonify({"error": "Account Creation Failed (System Error)."}), 500
 
         # Inject into Virtual Auth Engine
         PASSWORD_MAP[email] = pw
