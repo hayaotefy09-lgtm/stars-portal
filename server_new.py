@@ -393,22 +393,32 @@ def handle_register():
                 # ACTIVATE: Cross-Table Synchronization
                 success = False
                 
-                # 1. Update the 'users' table (Master Auth)
-                # If they aren't in 'users', we INSERT them to ensure login works.
+                # 1. Update the 'users' table (Master Auth) - Polymorphic Retry (v202.4)
                 try:
-                    # Try update first
-                    r_u = supabase_admin.table('users').select('id').eq('email', email).execute()
+                    # Probe for existing auth record
+                    r_u = supabase_admin.table('users').select('*').eq('email', email).execute()
                     if r_u.data:
-                        supabase_admin.table('users').update({"password": pw, "full_name": full_name}).eq('email', email).execute()
+                        # Update with polymorphic variants
+                        u_vars = [{"password": pw, "full_name": full_name}, {"password": pw, "name": full_name}, {"password": pw}]
+                        for uv in u_vars:
+                            try:
+                                supabase_admin.table('users').update(uv).eq('email', email).execute()
+                                success = True; break
+                            except: continue
                     else:
-                        # Insert new auth record
-                        supabase_admin.table('users').insert({
-                            "id": str(uuid.uuid4()), "email": email, "full_name": full_name, 
-                            "password": pw, "role": role
-                        }).execute()
-                    success = True
+                        # Insert with polymorphic variants
+                        i_vars = [
+                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "full_name": full_name, "role": role},
+                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "name": full_name, "role": role},
+                            {"id": str(uuid.uuid4()), "email": email, "password": pw, "role": role}
+                        ]
+                        for iv in i_vars:
+                            try:
+                                supabase_admin.table('users').insert(iv).execute()
+                                success = True; break
+                            except: continue
                 except Exception as e:
-                    print(f"[OMNI-AUTH DEBUG]: Users Table Sync Error: {str(e)}")
+                    print(f"[OMNI-AUTH DEBUG]: Users Table Sync Critical Error: {str(e)}")
 
                 # 2. Update the original discovery table (Legacy Sync)
                 update_variants = [
